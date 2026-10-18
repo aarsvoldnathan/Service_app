@@ -93,7 +93,7 @@ To test with employees before release, use TestFlight (iOS) and an Internal test
 
 `.github/workflows/ios-testflight.yml` builds the iPhone app on GitHub's Mac machines on every push to `main`.
 
-- To send a build to TestFlight, put `[upload]` in the commit message, or run the workflow from the Actions tab with "Upload to TestFlight" ticked.
+- To send a build to TestFlight, put `[upload]` in the first line of the commit message, or run the workflow from the Actions tab with "Upload to TestFlight" ticked.
 - It needs four repository secrets (Settings > Secrets and variables > Actions): `APPLE_TEAM_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY` (full text of the .p8 key file).
 - The upload registers the bundle ID `com.aarsvold.serviceceo` automatically. The app record must exist in App Store Connect (My Apps > + > New App, same bundle ID) before the first upload.
 - The app icon is `assets/icon.png`.

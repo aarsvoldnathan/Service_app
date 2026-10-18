@@ -1,7 +1,7 @@
 name: iPhone build and TestFlight
 
 # Every push to main (or a claude/ branch) builds the iPhone app to check it compiles.
-# A commit message containing [upload] (or a manual run with "upload" ticked)
+# A commit message whose first line contains [upload] (or a manual run with "upload" ticked)
 # also signs the app and sends it to TestFlight.
 
 on:
@@ -45,9 +45,21 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-    env:
-      UPLOAD: ${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || contains(github.event.head_commit.message, '[upload]') }}
     steps:
+      # Only the first line of the commit message counts, so a description
+      # that mentions [upload] doesn't send a build by accident.
+      - name: Decide whether to upload
+        env:
+          MANUAL_UPLOAD: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          UPLOAD=false
+          if [ "$MANUAL_UPLOAD" = "true" ]; then UPLOAD=true; fi
+          case "$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)" in
+            *"[upload]"*) UPLOAD=true ;;
+          esac
+          echo "UPLOAD=$UPLOAD" >> "$GITHUB_ENV"
+          echo "Upload to TestFlight: $UPLOAD"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
