@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Service Ceo",
+    "slug": "service-ceo",
+    "scheme": "serviceceo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0E1013",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aarsvold.serviceceo"
+    },
+    "android": {
+      "package": "com.aarsvold.serviceceo"
+    },
+    "plugins": ["expo-router"]
+  }
+}
