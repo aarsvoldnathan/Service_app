@@ -1,18 +1,23 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { DueInfo } from '../maintenance';
 import { colors, radius, spacing } from '../theme';
 
-export function DueRow({ item }: { item: DueInfo }) {
+export function DueRow({ item, onPress }: { item: DueInfo; onPress?: () => void }) {
   const color = item.status === 'overdue' ? colors.danger : colors.warn;
   return (
-    <View style={[styles.row, { borderLeftColor: color }]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.task.name}, ${item.asset.name}, ${item.detail}`}
+      style={({ pressed }) => [styles.row, { borderLeftColor: color }, pressed && { opacity: 0.7 }]}
+    >
       <View style={styles.main}>
         <Text style={styles.task}>{item.task.name}</Text>
         <Text style={styles.asset}>{item.asset.name}</Text>
       </View>
       <Text style={[styles.detail, { color }]}>{item.detail}</Text>
-    </View>
+    </Pressable>
   );
 }
 

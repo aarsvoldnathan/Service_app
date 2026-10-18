@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
 import { DueRow } from '../src/components/DueRow';
 import { HoursRow } from '../src/components/HoursRow';
 import { Tile } from '../src/components/Tile';
+import { Button } from '../src/components/ui';
 import { getDueList, getRecentLogs, getStaleAssets } from '../src/maintenance';
 import { useStore } from '../src/store';
 import { colors, spacing } from '../src/theme';
@@ -31,6 +32,9 @@ function Empty({ text }: { text: string }) {
 
 export default function Dashboard() {
   const { ready, assets, tasks, logs, updateHours } = useStore();
+  const router = useRouter();
+  const openService = (assetId?: string) =>
+    router.push(assetId ? { pathname: '/service', params: { assetId } } : '/service');
 
   if (!ready) {
     return (
@@ -64,11 +68,19 @@ export default function Dashboard() {
           <Tile label="Hours stale" value={stale.length} color={colors.accent} />
         </View>
 
+        <Button
+          title="Log a service"
+          onPress={() => openService()}
+          style={{ marginBottom: spacing.lg }}
+        />
+
         <Section title="Maintenance due">
           {due.length === 0 ? (
             <Empty text="Nothing due. All equipment is up to date." />
           ) : (
-            due.map((d) => <DueRow key={d.task.id} item={d} />)
+            due.map((d) => (
+              <DueRow key={d.task.id} item={d} onPress={() => openService(d.asset.id)} />
+            ))
           )}
         </Section>
 

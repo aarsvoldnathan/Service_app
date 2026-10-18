@@ -17,6 +17,17 @@ export function buildSeedData(): {
       serial: 'KBT-L3901-48213',
       currentHours: 412,
       hoursUpdatedAt: daysAgo(2),
+      specs: {
+        lugNutTorque: '75 ft-lb (sample)',
+        tirePressure: 'Front 26 psi / Rear 18 psi (sample)',
+        oilCapacity: '6.5 qt (sample)',
+        oilType: '15W-40 diesel (sample)',
+        filters: [
+          { label: 'Oil filter', partNumber: 'SAMPLE-OF-101' },
+          { label: 'Fuel filter', partNumber: 'SAMPLE-FF-102' },
+          { label: 'Hydraulic filter', partNumber: 'SAMPLE-HF-103' },
+        ],
+      },
     },
     {
       id: 'a2',
@@ -24,6 +35,14 @@ export function buildSeedData(): {
       serial: 'HND-EU7000-90377',
       currentHours: 188,
       hoursUpdatedAt: daysAgo(12),
+      specs: {
+        oilCapacity: '1.2 qt (sample)',
+        oilType: '10W-30 (sample)',
+        filters: [
+          { label: 'Air filter', partNumber: 'SAMPLE-AF-201' },
+          { label: 'Spark plug', partNumber: 'SAMPLE-SP-202' },
+        ],
+      },
     },
     {
       id: 'a3',
@@ -31,6 +50,15 @@ export function buildSeedData(): {
       serial: 'BBC-T595-11452',
       currentHours: 1264,
       hoursUpdatedAt: daysAgo(9),
+      specs: {
+        tirePressure: 'Tracks: check tension (sample)',
+        oilCapacity: '11 qt (sample)',
+        oilType: '15W-40 diesel (sample)',
+        filters: [
+          { label: 'Oil filter', partNumber: 'SAMPLE-OF-301' },
+          { label: 'Fuel filter', partNumber: 'SAMPLE-FF-302' },
+        ],
+      },
     },
   ];
 
