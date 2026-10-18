@@ -89,6 +89,15 @@ After `npm run setup`, commit the updated `package.json` and new `package-lock.j
 
 To test with employees before release, use TestFlight (iOS) and an Internal testing track (Android).
 
+## TestFlight builds from GitHub (no Mac needed)
+
+`.github/workflows/ios-testflight.yml` builds the iPhone app on GitHub's Mac machines on every push to `main`.
+
+- To send a build to TestFlight, put `[upload]` in the commit message, or run the workflow from the Actions tab with "Upload to TestFlight" ticked.
+- It needs four repository secrets (Settings > Secrets and variables > Actions): `APPLE_TEAM_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY` (full text of the .p8 key file).
+- The upload registers the bundle ID `com.aarsvold.serviceceo` automatically. The app record must exist in App Store Connect (My Apps > + > New App, same bundle ID) before the first upload.
+- The app icon is `assets/icon.png`.
+
 ## Roadmap
 
 1. Screen 2: equipment detail with service specs (lug nut torque, tire pressure, oil type and capacity, filter part numbers) and the service logging form.
