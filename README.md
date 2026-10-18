@@ -97,6 +97,7 @@ To test with employees before release, use TestFlight (iOS) and an Internal test
 - It needs four repository secrets (Settings > Secrets and variables > Actions): `APPLE_TEAM_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY` (full text of the .p8 key file).
 - The upload registers the bundle ID `com.aarsvold.serviceceo` automatically. The app record must exist in App Store Connect (My Apps > + > New App, same bundle ID) before the first upload.
 - The app icon is `assets/icon.png`.
+- After an upload, the build shows up in App Store Connect > TestFlight once Apple finishes processing it, usually within 15 minutes.
 
 ## Roadmap
 
