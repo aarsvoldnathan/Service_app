@@ -741,7 +741,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       version: 3,
       exportedAt: new Date().toISOString(),
       fleet,
-      technicians: d.technicians.filter((t) => fleet.memberIds.includes(t.id)),
+      // Wages stay private: hourly rates are never put in a fleet file.
+      technicians: d.technicians.filter((t) => fleet.memberIds.includes(t.id)).map(({ hourlyRate: _rate, ...t }) => t),
       categories: d.categories.filter((c) => usedCats.has(c.id)),
       assets,
       tasks: d.tasks.filter((t) => ids.has(t.assetId)),
@@ -765,7 +766,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((d) => ({
       ...d,
       fleets: merge(d.fleets, [b.fleet]),
-      technicians: merge(d.technicians, b.technicians),
+      technicians: merge(
+        d.technicians,
+        (b.technicians ?? []).map((t) => ({ ...t, hourlyRate: d.technicians.find((x) => x.id === t.id)?.hourlyRate })),
+      ),
       categories: merge(d.categories, b.categories),
       assets: merge(d.assets, assets),
       tasks: merge(d.tasks, b.tasks),

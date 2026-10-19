@@ -98,7 +98,7 @@ export default function CrewScreen() {
           <SectionTitle>2. Send the fleet</SectionTitle>
           <Card>
             <Text style={s.body}>
-              Sends “{fleet.name}” as a file: its machines, schedules, service history, assignments, shopping list and crew. They open it with
+              Sends “{fleet.name}” as a file: its machines, schedules, service history, assignments, shopping list and crew names (never hourly rates, jobs or invoices). They open it with
               Import below. Send it again whenever you want them to have your latest updates.
             </Text>
             <Button title={`Send ${fleet.name}`} onPress={sendFleet} />
