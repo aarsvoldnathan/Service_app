@@ -170,6 +170,8 @@ export type ShoppingItem = {
 /** A job or work week: time and expenses that become one invoice. */
 export type Job = {
   id: string;
+  /** Fleet the job belongs to (used for online sharing and privacy). */
+  fleetId?: string;
   title: string;
   /** Bill to. */
   client?: string;

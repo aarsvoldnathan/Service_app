@@ -31,7 +31,48 @@ import {
   TimeEntry,
 } from './types';
 
-const STORAGE_KEY = 'service-ceo:v1';
+/** Data saved on this phone before accounts existed. */
+export const LEGACY_STORAGE_KEY = 'service-ceo:v1';
+export const userStorageKey = (userId: string) => `service-ceo:user:${userId}`;
+
+/** A brand-new account starts with no fleets until it uploads, joins or creates one. */
+export function emptyData(): AppData {
+  return {
+    version: 3,
+    categories: DEFAULT_CATEGORIES,
+    shopping: [],
+    jobs: [],
+    timeEntries: [],
+    expenses: [],
+    fleets: [],
+    technicians: [],
+    assets: [],
+    tasks: [],
+    logs: [],
+    assignments: [],
+    prefs: { theme: 'system', accent: 'amber', activeFleetId: '', business: { nextInvoiceNumber: 1001 } },
+  };
+}
+
+/** Read the pre-account data on this phone (or null if there is none). */
+export async function loadLegacyData(): Promise<AppData | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+    return raw ? upgrade(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+const PLACEHOLDER_FLEET: Fleet = {
+  id: '',
+  name: 'No fleet',
+  kind: 'work',
+  memberIds: [],
+  staleHoursDays: 7,
+  orangeOverdueHours: 10,
+  majorWarnHours: 10,
+};
 
 export const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -61,6 +102,10 @@ export type FleetBundle = {
 
 type StoreValue = AppData & {
   ready: boolean;
+  /** The whole data set (for syncing). */
+  data: AppData;
+  /** Replace data (used by the online sync). */
+  replaceData: (fn: (d: AppData) => AppData) => void;
   activeFleet: Fleet;
   /** Machines in the active fleet. */
   fleetAssets: Asset[];
@@ -156,7 +201,8 @@ function upgrade(raw: any): AppData {
   if (raw?.version === 3) {
     const seed = buildSeedData();
     const d = raw as AppData;
-    const fleets = d.fleets?.length ? d.fleets : seed.fleets;
+    // An account with no fleets yet stays empty (no demo data mixed into online fleets).
+    const fleets = d.fleets ?? [];
     return {
       ...d,
       fleets,
@@ -170,7 +216,7 @@ function upgrade(raw: any): AppData {
         ...seed.prefs,
         ...d.prefs,
         business: { ...seed.prefs.business, name: undefined, ...d.prefs?.business },
-        activeFleetId: fleets.some((f) => f.id === d.prefs?.activeFleetId) ? d.prefs.activeFleetId : fleets[0].id,
+        activeFleetId: fleets.some((f) => f.id === d.prefs?.activeFleetId) ? d.prefs.activeFleetId : fleets[0]?.id ?? '',
       },
     };
   }
@@ -282,30 +328,42 @@ function startingTasks(assetId: string, currentHours: number, templateId?: strin
 
 // ---------- Provider ----------
 
-export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [data, setData] = useState<AppData>(() => buildSeedData());
+export function StoreProvider({ children, storageKey }: { children: React.ReactNode; storageKey: string }) {
+  const [data, setData] = useState<AppData>(() => emptyData());
   const [ready, setReady] = useState(false);
   const [currentAssetId, setCurrentAssetId] = useState<string | undefined>();
   // Latest data for validations inside callbacks without re-creating them.
   const ref = useRef(data);
   ref.current = data;
 
+  // Each account has its own saved copy on the phone.
+  const loadedKey = useRef<string | null>(null);
   useEffect(() => {
+    let alive = true;
+    setReady(false);
+    loadedKey.current = null;
     (async () => {
+      let next: AppData;
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        setData(raw ? upgrade(JSON.parse(raw)) : buildSeedData());
+        const raw = await AsyncStorage.getItem(storageKey);
+        next = raw ? upgrade(JSON.parse(raw)) : emptyData();
       } catch {
-        setData(buildSeedData());
+        next = emptyData();
       }
+      if (!alive) return;
+      setData(next);
+      loadedKey.current = storageKey;
       setReady(true);
     })();
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch(() => {});
-  }, [data, ready]);
+    if (!ready || loadedKey.current !== storageKey) return;
+    AsyncStorage.setItem(storageKey, JSON.stringify(data)).catch(() => {});
+  }, [data, ready, storageKey]);
 
   const update = useCallback((fn: (d: AppData) => AppData) => setData(fn), []);
 
@@ -642,7 +700,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const saveJob = useCallback((input: Omit<Job, 'id' | 'createdAt' | 'status'> & Partial<Job>) => {
     if (!input.title.trim()) return { error: 'Enter a job name.' };
     if (!Number.isFinite(input.rate) || input.rate < 0) return { error: 'Enter a valid hourly rate.' };
-    const job: Job = { createdAt: new Date().toISOString(), status: 'open', ...input, id: input.id ?? newId(), title: input.title.trim() };
+    const job: Job = {
+      createdAt: new Date().toISOString(),
+      status: 'open',
+      fleetId: ref.current.prefs.activeFleetId || undefined,
+      ...input,
+      id: input.id ?? newId(),
+      title: input.title.trim(),
+    };
     update((d) => ({
       ...d,
       jobs: d.jobs.some((x) => x.id === job.id) ? d.jobs.map((x) => (x.id === job.id ? job : x)) : [job, ...d.jobs],
@@ -793,11 +858,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const resetDemoData = useCallback(() => setData(buildSeedData()), []);
 
   const value = useMemo<StoreValue>(() => {
-    const activeFleet = data.fleets.find((f) => f.id === data.prefs.activeFleetId) ?? data.fleets[0];
+    const activeFleet = data.fleets.find((f) => f.id === data.prefs.activeFleetId) ?? data.fleets[0] ?? PLACEHOLDER_FLEET;
     const techName = (id?: string) =>
       (id && data.technicians.find((t) => t.id === id)?.name) || 'Unassigned';
     return {
       ...data,
+      data,
+      replaceData: update,
       ready,
       activeFleet,
       fleetAssets: data.assets.filter((a) => a.fleetId === activeFleet.id),
@@ -850,7 +917,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       resetDemoData,
     };
   }, [
-    data, ready, currentAssetId, updateHours, addServiceLog, updateSpecs, saveAsset, deleteAsset, applyTemplate, quickAdd,
+    data, update, ready, currentAssetId, updateHours, addServiceLog, updateSpecs, saveAsset, deleteAsset, applyTemplate, quickAdd,
     saveTask, deleteTask, saveFleet, deleteFleet, saveTechnician, deleteTechnician, saveAssignment,
     toggleChecklistItem, setAssignmentStatus, deleteAssignment, setPrefs, resetDemoData,
     saveCategory, deleteCategory, saveShoppingItem, toggleShoppingItem, deleteShoppingItem, clearPurchased,

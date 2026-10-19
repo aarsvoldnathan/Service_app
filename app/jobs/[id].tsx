@@ -6,6 +6,7 @@ import { money, parseDate, parseMoney, shortDate, todayText } from '../../src/da
 import { jobTotals } from '../../src/finance';
 import { shareInvoicePdf, shareInvoiceText } from '../../src/invoice';
 import { captureReceipt, deleteReceipt } from '../../src/receipts';
+import { useCloud } from '../../src/cloud';
 import { useStore } from '../../src/store';
 import { Palette, radius, spacing, useStyles, useTheme } from '../../src/theme';
 import { Expense, TimeEntry } from '../../src/types';
@@ -18,6 +19,7 @@ export default function JobScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const store = useStore();
+  const { isOwner } = useCloud();
   const { jobs, timeEntries, expenses, technicians, assets, prefs, technicianName } = store;
   const job = jobs.find((j) => j.id === id);
 
@@ -321,13 +323,17 @@ export default function JobScreen() {
               <Field label="Job name" value={title} onChangeText={setTitle} />
               <Field label="Bill to" value={client} onChangeText={setClient} />
               <Field label="Customer phone / email" value={contact} onChangeText={setContact} autoCapitalize="none" />
-              <Text style={s.label}>Who is working</Text>
-              <ChipSelect
-                options={[...technicians.map((t) => ({ value: t.id, label: t.name })), { value: NONE, label: 'Not set' }]}
-                value={techId}
-                onChange={setTechId}
-              />
-              <View style={{ height: spacing.md }} />
+              {isOwner ? (
+                <>
+                  <Text style={s.label}>Who is working</Text>
+                  <ChipSelect
+                    options={[...technicians.map((t) => ({ value: t.id, label: t.name })), { value: NONE, label: 'Not set' }]}
+                    value={techId}
+                    onChange={setTechId}
+                  />
+                  <View style={{ height: spacing.md }} />
+                </>
+              ) : null}
               <Field label="Hourly rate ($)" keyboardType="decimal-pad" value={rate} onChangeText={setRate} />
               <Field label="Invoice notes" placeholder="Payment terms, thank-you note" value={notes} onChangeText={setNotes} multiline />
               <View style={s.two}>

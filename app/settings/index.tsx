@@ -46,7 +46,7 @@ export default function SettingsScreen() {
         <SectionTitle>Crew</SectionTitle>
         <ListRow
           title="Crew & sharing"
-          subtitle="Invite someone, send or import a fleet"
+          subtitle="Invite code, roles, join another crew"
           onPress={() => router.push('/settings/crew')}
         />
 

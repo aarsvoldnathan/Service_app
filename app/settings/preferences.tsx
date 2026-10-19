@@ -3,19 +3,19 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, ChipSelect, Field, SectionTitle } from '../../src/components/ui';
+import { useAuth } from '../../src/auth';
+import { ROLE_LABEL, useCloud } from '../../src/cloud';
 import { ANDROID_BUILD } from '../../src/config';
 import { useStore } from '../../src/store';
 import { ACCENTS, AccentKey, Palette, spacing, ThemeMode, useStyles } from '../../src/theme';
 
 export default function PreferencesScreen() {
   const s = useStyles(makeStyles);
-  const { prefs, setPrefs, technicians, resetDemoData } = useStore();
+  const { prefs, setPrefs, activeFleet } = useStore();
+  const { email, signOut } = useAuth();
+  const { myRole, lastSync, syncError } = useCloud();
 
-  const reset = () =>
-    Alert.alert('Load demo data?', 'This replaces ALL fleets, machines, technicians and service records on this phone with the demo set.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Replace everything', style: 'destructive', onPress: resetDemoData },
-    ]);
+
 
   return (
     <View style={{ flex: 1 }}>
@@ -41,16 +41,7 @@ export default function PreferencesScreen() {
           />
         </Card>
 
-        <SectionTitle>This phone</SectionTitle>
-        <Card style={s.card}>
-          <Text style={s.label}>Who uses this phone?</Text>
-          <ChipSelect
-            options={technicians.map((t) => ({ value: t.id, label: t.name }))}
-            value={prefs.meTechnicianId}
-            onChange={(v) => setPrefs({ meTechnicianId: v })}
-          />
-          <Text style={s.help}>Pre-fills “Service done by” and assignments.</Text>
-        </Card>
+
 
         <SectionTitle>Invoice details</SectionTitle>
         <Card style={s.card}>
@@ -89,13 +80,25 @@ export default function PreferencesScreen() {
           />
         </Card>
 
-        <SectionTitle>Data</SectionTitle>
+        <SectionTitle>Account</SectionTitle>
         <Card style={s.card}>
+          <Text style={s.value}>{email}</Text>
           <Text style={s.help}>
-            Data is stored on this phone. Shared fleets across phones will come with sign-in. Demo data includes factory schedules for a
-            Kubota L3901, Bobcat T595 and Honda EU7000is.
+            {activeFleet.name}: {myRole ? ROLE_LABEL[myRole] : 'not connected yet'}
+            {'\n'}
+            {syncError ? `Sync problem: ${syncError}` : lastSync ? `Last synced ${lastSync.toLocaleTimeString()}` : 'Syncing…'}
           </Text>
-          <Button title="Load demo data" variant="danger" onPress={reset} style={{ marginTop: spacing.sm }} />
+          <Button
+            title="Sign out"
+            variant="danger"
+            onPress={() =>
+              Alert.alert('Sign out?', 'Your data stays online. Sign in again any time.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Sign out', style: 'destructive', onPress: signOut },
+              ])
+            }
+            style={{ marginTop: spacing.sm }}
+          />
         </Card>
 
         <Text style={s.version}>
@@ -112,6 +115,7 @@ const makeStyles = (c: Palette) =>
     content: { padding: spacing.md, paddingBottom: spacing.lg * 3 },
     card: { marginBottom: spacing.lg },
     label: { color: c.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
+    value: { color: c.text, fontSize: 17, fontWeight: '700' },
     help: { color: c.muted, fontSize: 13, marginTop: spacing.sm },
     version: { color: c.muted, fontSize: 12, textAlign: 'center' },
   });

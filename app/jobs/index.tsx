@@ -5,6 +5,7 @@ import { BarChart } from '../../src/components/BarChart';
 import { Button, Card, ChipSelect, Field, ListRow, Muted, SectionTitle } from '../../src/components/ui';
 import { money, parseMoney, shortDate } from '../../src/dates';
 import { buckets, jobTotals, Period, PERIOD_LABEL } from '../../src/finance';
+import { useCloud } from '../../src/cloud';
 import { useStore } from '../../src/store';
 import { Palette, radius, spacing, useStyles, useTheme } from '../../src/theme';
 import { Job } from '../../src/types';
@@ -19,7 +20,12 @@ export default function JobsScreen() {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
-  const { jobs, timeEntries, expenses, technicians, prefs, fleetAssets, saveJob, technicianName } = useStore();
+  const { jobs, timeEntries, expenses, technicians: allTechs, prefs, fleetAssets, saveJob, technicianName, activeFleet } = useStore();
+  const { isOwner } = useCloud();
+  // Only the owner can bill for or see other people. Everyone else works with their own profile.
+  const technicians = isOwner
+    ? allTechs.filter((t) => activeFleet.memberIds.includes(t.id))
+    : allTechs.filter((t) => t.id === prefs.meTechnicianId);
   const [tab, setTab] = useState<Tab>('jobs');
 
   // New job form
@@ -33,7 +39,7 @@ export default function JobsScreen() {
 
   // Earnings
   const [period, setPeriod] = useState<Period>('week');
-  const [who, setWho] = useState<string>(ALL);
+  const [who, setWho] = useState<string>(isOwner ? ALL : prefs.meTechnicianId ?? ALL);
 
   const pickTech = (id: string) => {
     setTechId(id);
@@ -47,8 +53,9 @@ export default function JobsScreen() {
       title,
       client: client.trim() || undefined,
       clientContact: contact.trim() || undefined,
-      technicianId: techId === NONE ? undefined : techId,
+      technicianId: isOwner ? (techId === NONE ? undefined : techId) : prefs.meTechnicianId,
       assetId: assetId === NONE ? undefined : assetId,
+      fleetId: activeFleet.id,
       rate: r,
     });
     if (error || !id) {
@@ -101,13 +108,17 @@ export default function JobsScreen() {
                 <Field label="Job name" placeholder="e.g. Week of Oct 19, Smith driveway" value={title} onChangeText={setTitle} />
                 <Field label="Bill to" placeholder="Customer or company" value={client} onChangeText={setClient} />
                 <Field label="Customer phone / email" value={contact} onChangeText={setContact} autoCapitalize="none" />
-                <Text style={s.label}>Who is working</Text>
-                <ChipSelect
-                  options={[...technicians.map((t) => ({ value: t.id, label: t.name })), { value: NONE, label: 'Not set' }]}
-                  value={techId}
-                  onChange={pickTech}
-                />
-                <View style={{ height: spacing.md }} />
+                {isOwner ? (
+                  <>
+                    <Text style={s.label}>Who is working</Text>
+                    <ChipSelect
+                      options={[...technicians.map((t) => ({ value: t.id, label: t.name })), { value: NONE, label: 'Not set' }]}
+                      value={techId}
+                      onChange={pickTech}
+                    />
+                    <View style={{ height: spacing.md }} />
+                  </>
+                ) : null}
                 <Field label="Hourly rate ($)" keyboardType="decimal-pad" placeholder="e.g. 85" value={rate} onChangeText={setRate} />
                 <Text style={s.label}>Machine (optional)</Text>
                 <ChipSelect
@@ -156,13 +167,19 @@ export default function JobsScreen() {
           </>
         ) : (
           <>
-            <Text style={s.label}>Person</Text>
-            <ChipSelect
-              options={[{ value: ALL, label: 'Everyone' }, ...technicians.map((t) => ({ value: t.id, label: t.name }))]}
-              value={who}
-              onChange={setWho}
-            />
-            <View style={{ height: spacing.md }} />
+            {isOwner ? (
+              <>
+                <Text style={s.label}>Person</Text>
+                <ChipSelect
+                  options={[{ value: ALL, label: 'Everyone' }, ...technicians.map((t) => ({ value: t.id, label: t.name }))]}
+                  value={who}
+                  onChange={setWho}
+                />
+                <View style={{ height: spacing.md }} />
+              </>
+            ) : (
+              <Text style={s.label}>Your hours, income and expenses. Only you and the fleet owner can see these.</Text>
+            )}
             <ChipSelect
               options={(Object.keys(PERIOD_LABEL) as Period[]).map((p) => ({ value: p, label: PERIOD_LABEL[p] }))}
               value={period}

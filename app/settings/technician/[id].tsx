@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, CheckRow, ChipSelect, Field, SectionTitle } from '../../../src/components/ui';
+import { useCloud } from '../../../src/cloud';
 import { useStore } from '../../../src/store';
 import { Palette, spacing, useStyles } from '../../../src/theme';
 
@@ -10,6 +11,7 @@ export default function TechnicianEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { technicians, fleets, prefs, saveTechnician, deleteTechnician, saveFleet, setPrefs } = useStore();
+  const { isOwner } = useCloud();
   const existing = technicians.find((t) => t.id === id);
   const isNew = !existing;
 
@@ -71,7 +73,16 @@ export default function TechnicianEditScreen() {
           <Field label="Role" placeholder="e.g. Technician, Shop lead, Family" value={role} onChangeText={setRole} />
           <Field label="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <Field label="Email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
-          <Field label="Hourly rate ($)" keyboardType="decimal-pad" placeholder="Used for new jobs" value={rate} onChangeText={setRate} />
+          {isOwner ? (
+            <Field
+              label="Hourly rate ($)"
+              keyboardType="decimal-pad"
+              placeholder="Used for new jobs"
+              value={rate}
+              onChangeText={setRate}
+              hint="Private: only you (the owner) and this person can see it."
+            />
+          ) : null}
           <CheckRow checked={isMe} onToggle={() => setIsMe((v) => !v)} title="This is me" detail="Pre-fills “Service done by” on this phone" />
         </Card>
 

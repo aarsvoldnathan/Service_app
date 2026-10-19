@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, ChipSelect, Field, Muted, SectionTitle } from '../../../src/components/ui';
 import { DEFAULT_THRESHOLDS } from '../../../src/maintenance';
+import { useCloud } from '../../../src/cloud';
 import { useStore } from '../../../src/store';
 import { Palette, spacing, useStyles } from '../../../src/theme';
 import { Fleet } from '../../../src/types';
@@ -17,8 +18,11 @@ export default function FleetEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { fleets, technicians, assets, saveFleet, deleteFleet, setPrefs, activeFleet } = useStore();
+  const { memberships, deleteFleetOnline } = useCloud();
   const existing = fleets.find((f) => f.id === id);
   const isNew = !existing;
+  // New fleets belong to whoever creates them; existing fleets can only be changed by their owner.
+  const canEdit = isNew || memberships.get(existing!.id)?.role === 'owner';
 
   const [name, setName] = useState(existing?.name ?? '');
   const [kind, setKind] = useState<Fleet['kind']>(existing?.kind ?? 'work');
@@ -56,7 +60,10 @@ export default function FleetEditScreen() {
         onPress: () => {
           const error = deleteFleet(existing!.id);
           if (error) Alert.alert('Cannot delete', error);
-          else router.back();
+          else {
+            deleteFleetOnline(existing!.id);
+            router.back();
+          }
         },
       },
     ]);
@@ -125,7 +132,11 @@ export default function FleetEditScreen() {
           </Card>
         </View>
 
-        <Button title="Save fleet" onPress={save} />
+        {canEdit ? (
+          <Button title="Save fleet" onPress={save} />
+        ) : (
+          <Text style={s.help}>Only the fleet owner can change these settings.</Text>
+        )}
         {!isNew && existing!.id !== activeFleet.id && (
           <Button
             title="View this fleet"
@@ -137,7 +148,7 @@ export default function FleetEditScreen() {
             style={{ marginTop: spacing.sm }}
           />
         )}
-        {!isNew && (
+        {!isNew && canEdit && (
           <Button
             title={machineCount ? `Delete fleet (move its ${machineCount} machines first)` : 'Delete fleet'}
             variant="danger"
@@ -145,9 +156,7 @@ export default function FleetEditScreen() {
             style={{ marginTop: spacing.sm }}
           />
         )}
-        <Text style={s.note}>
-          Sharing a fleet with other people's phones arrives with sign-in (Supabase). For now, fleets and members are kept on this phone.
-        </Text>
+        <Text style={s.note}>Everyone in this fleet sees its machines, service and shopping list. Hours, rates and invoices are private to each person and the owner.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
