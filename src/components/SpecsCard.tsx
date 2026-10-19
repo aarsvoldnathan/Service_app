@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing, touch } from '../theme';
+import { StyleSheet, Text, View } from 'react-native';
+import { Palette, spacing, touch, useStyles } from '../theme';
 import { Asset, AssetSpecs, FilterSpec } from '../types';
-import { Button, Card, Field } from './ui';
+import { Button, Card, Field, Input } from './ui';
 
 type Props = {
   asset: Asset;
@@ -17,6 +17,7 @@ const ROWS: { key: Exclude<keyof AssetSpecs, 'filters'>; label: string; placehol
 ];
 
 export function SpecsCard({ asset, onSave }: Props) {
+  const s = useStyles(makeStyles);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AssetSpecs>(asset.specs);
 
@@ -34,10 +35,7 @@ export function SpecsCard({ asset, onSave }: Props) {
   };
 
   const setFilter = (index: number, patch: Partial<FilterSpec>) =>
-    setDraft((d) => ({
-      ...d,
-      filters: d.filters.map((f, i) => (i === index ? { ...f, ...patch } : f)),
-    }));
+    setDraft((d) => ({ ...d, filters: d.filters.map((f, i) => (i === index ? { ...f, ...patch } : f)) }));
 
   if (editing) {
     return (
@@ -51,20 +49,13 @@ export function SpecsCard({ asset, onSave }: Props) {
             onChangeText={(v) => setDraft((d) => ({ ...d, [r.key]: v }))}
           />
         ))}
-        <Text style={styles.label}>Filters and part numbers</Text>
+        <Text style={s.label}>Filters and part numbers</Text>
         {draft.filters.map((f, i) => (
-          <View key={i} style={styles.filterEditRow}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Filter (e.g. Oil filter)"
-              placeholderTextColor={colors.muted}
-              value={f.label}
-              onChangeText={(v) => setFilter(i, { label: v })}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
+          <View key={i} style={s.filterEditRow}>
+            <Input style={{ flex: 1 }} placeholder="Filter (e.g. Oil filter)" value={f.label} onChangeText={(v) => setFilter(i, { label: v })} />
+            <Input
+              style={{ flex: 1 }}
               placeholder="Part number"
-              placeholderTextColor={colors.muted}
               autoCapitalize="characters"
               value={f.partNumber}
               onChangeText={(v) => setFilter(i, { partNumber: v })}
@@ -72,21 +63,18 @@ export function SpecsCard({ asset, onSave }: Props) {
             <Button
               title="✕"
               variant="danger"
-              style={{ width: touch }}
-              onPress={() =>
-                setDraft((d) => ({ ...d, filters: d.filters.filter((_, j) => j !== i) }))
-              }
+              style={{ width: touch, paddingHorizontal: 0 }}
+              accessibilityLabel="Remove filter"
+              onPress={() => setDraft((d) => ({ ...d, filters: d.filters.filter((_, j) => j !== i) }))}
             />
           </View>
         ))}
         <Button
           title="+ Add filter"
           variant="secondary"
-          onPress={() =>
-            setDraft((d) => ({ ...d, filters: [...d.filters, { label: '', partNumber: '' }] }))
-          }
+          onPress={() => setDraft((d) => ({ ...d, filters: [...d.filters, { label: '', partNumber: '' }] }))}
         />
-        <View style={styles.actions}>
+        <View style={s.actions}>
           <Button title="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => setEditing(false)} />
           <Button title="Save specs" style={{ flex: 1 }} onPress={save} />
         </View>
@@ -97,69 +85,61 @@ export function SpecsCard({ asset, onSave }: Props) {
   const { specs } = asset;
   return (
     <Card>
-      <View style={styles.grid}>
+      <View style={s.grid}>
         {ROWS.map((r) => (
-          <View key={r.key} style={styles.cell}>
-            <Text style={styles.cellLabel}>{r.label}</Text>
-            <Text style={[styles.cellValue, !specs[r.key] && styles.missing]}>
-              {specs[r.key] || 'Not set'}
-            </Text>
+          <View key={r.key} style={s.cell}>
+            <Text style={s.cellLabel}>{r.label}</Text>
+            <Text style={[s.cellValue, !specs[r.key] && s.missing]}>{specs[r.key] || 'Not set'}</Text>
           </View>
         ))}
       </View>
-      <Text style={[styles.cellLabel, { marginTop: spacing.sm }]}>Filters and part numbers</Text>
+      <Text style={[s.cellLabel, { marginTop: spacing.sm }]}>Filters and part numbers</Text>
       {specs.filters.length === 0 ? (
-        <Text style={[styles.cellValue, styles.missing]}>None added</Text>
+        <Text style={[s.cellValue, s.missing]}>None added</Text>
       ) : (
         specs.filters.map((f, i) => (
-          <View key={i} style={styles.filterRow}>
-            <Text style={styles.filterLabel}>{f.label}</Text>
-            <Text style={styles.partNumber} selectable>
+          <View key={i} style={s.filterRow}>
+            <Text style={s.filterLabel}>{f.label}</Text>
+            <Text style={s.partNumber} selectable>
               {f.partNumber}
             </Text>
           </View>
         ))
       )}
-      <Text style={styles.note}>Always confirm specs against the operator's manual.</Text>
+      {asset.notes ? <Text style={s.assetNotes}>{asset.notes}</Text> : null}
+      <Text style={s.note}>Always confirm specs against the operator's manual.</Text>
       <Button title="Edit specs" variant="secondary" onPress={startEdit} style={{ marginTop: spacing.sm }} />
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -spacing.xs },
-  cell: { width: '50%', paddingHorizontal: spacing.xs, marginBottom: spacing.md },
-  cellLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  cellValue: { color: colors.text, fontSize: 17, fontWeight: '700' },
-  missing: { color: colors.muted, fontWeight: '400' },
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  filterLabel: { color: colors.text, fontSize: 16 },
-  partNumber: { color: colors.accent, fontSize: 16, fontWeight: '800' },
-  note: { color: colors.muted, fontSize: 12, marginTop: spacing.sm },
-  label: { color: colors.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
-  filterEditRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  input: {
-    minHeight: touch,
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius,
-    paddingHorizontal: spacing.sm,
-    color: colors.text,
-    fontSize: 16,
-  },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -spacing.xs },
+    cell: { width: '50%', paddingHorizontal: spacing.xs, marginBottom: spacing.md },
+    cellLabel: {
+      color: c.muted,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: 2,
+    },
+    cellValue: { color: c.text, fontSize: 17, fontWeight: '700' },
+    missing: { color: c.muted, fontWeight: '400' },
+    filterRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    filterLabel: { color: c.text, fontSize: 16, flexShrink: 1 },
+    partNumber: { color: c.accent, fontSize: 16, fontWeight: '800' },
+    assetNotes: { color: c.text, fontSize: 14, marginTop: spacing.sm },
+    note: { color: c.muted, fontSize: 12, marginTop: spacing.sm },
+    label: { color: c.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
+    filterEditRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  });

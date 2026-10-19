@@ -1,0 +1,51 @@
+import { Stack, useRouter } from 'expo-router';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ListRow, SectionTitle } from '../../src/components/ui';
+import { useStore } from '../../src/store';
+import { Palette, spacing, useStyles } from '../../src/theme';
+
+export default function SettingsScreen() {
+  const s = useStyles(makeStyles);
+  const router = useRouter();
+  const { fleets, assets, technicians, activeFleet } = useStore();
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack.Screen options={{ title: 'Settings' }} />
+      <ScrollView contentContainerStyle={s.content}>
+        <Text style={s.active}>Viewing: {activeFleet.name}</Text>
+
+        <SectionTitle>Profiles</SectionTitle>
+        <ListRow
+          title="Fleets"
+          subtitle="Work and home fleets, members and status rules"
+          right={String(fleets.length)}
+          onPress={() => router.push('/settings/fleets')}
+        />
+        <ListRow
+          title="Machines"
+          subtitle="Machine profiles, serial numbers, barcodes, schedules"
+          right={String(assets.length)}
+          onPress={() => router.push('/settings/machines')}
+        />
+        <ListRow
+          title="Technicians"
+          subtitle="Employees and family members"
+          right={String(technicians.length)}
+          onPress={() => router.push('/settings/technicians')}
+        />
+
+        <View style={{ height: spacing.md }} />
+        <SectionTitle>App</SectionTitle>
+        <ListRow title="Preferences and theme" subtitle="Light / dark mode, accent color, who uses this phone" onPress={() => router.push('/settings/preferences')} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    content: { padding: spacing.md, paddingBottom: spacing.lg * 3 },
+    active: { color: c.muted, fontSize: 14, marginBottom: spacing.md },
+  });

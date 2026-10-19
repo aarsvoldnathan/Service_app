@@ -1,13 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { computeDue } from '../maintenance';
-import { colors, radius, spacing, touch } from '../theme';
-import { Asset, NewServiceLog, PartUsed, ServiceTask } from '../types';
-import { Button, Card, CheckRow, Field } from './ui';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { computeDue, Thresholds } from '../maintenance';
+import { Palette, spacing, touch, useStyles, useTheme } from '../theme';
+import { Asset, NewServiceLog, PartUsed, ServiceTask, Technician } from '../types';
+import { Button, Card, CheckRow, ChipSelect, Field, Input, levelColor } from './ui';
 
 type Props = {
   asset: Asset;
   tasks: ServiceTask[];
+  thresholds: Thresholds;
+  technicians: Technician[];
+  defaultTechnicianId?: string;
   onSubmit: (entry: NewServiceLog) => string | null;
 };
 
@@ -30,9 +33,13 @@ function parseDate(text: string): string | null {
 
 const emptyPart = (): PartUsed => ({ name: '', partNumber: '', quantity: '1' });
 
-export function ServiceForm({ asset, tasks, onSubmit }: Props) {
-  const [performedBy, setPerformedBy] = useState('');
+export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTechnicianId, onSubmit }: Props) {
+  const s = useStyles(makeStyles);
+  const { c } = useTheme();
+  const defaultName = technicians.find((t) => t.id === defaultTechnicianId)?.name ?? '';
+  const [performedBy, setPerformedBy] = useState(defaultName);
   const [title, setTitle] = useState('');
+  const [titleTouched, setTitleTouched] = useState(false);
   const [description, setDescription] = useState('');
   const [parts, setParts] = useState<PartUsed[]>([]);
   const [dateText, setDateText] = useState(todayText());
@@ -40,20 +47,22 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
   const [notes, setNotes] = useState('');
   const [completed, setCompleted] = useState<string[]>([]);
 
+  // Follow hour updates made at the top of the screen.
+  useEffect(() => setHoursText(String(asset.currentHours)), [asset.currentHours]);
+
   const scheduled = useMemo(() => {
     const now = new Date();
-    return tasks.map((t) => computeDue(t, asset, now)).sort((a, b) => a.urgency - b.urgency);
-  }, [tasks, asset]);
+    return tasks.map((t) => computeDue(t, asset, now, thresholds)).sort((a, b) => a.urgency - b.urgency);
+  }, [tasks, asset, thresholds]);
 
   const toggleTask = (task: ServiceTask) => {
-    const isOn = completed.includes(task.id);
-    setCompleted((c) => (isOn ? c.filter((id) => id !== task.id) : [...c, task.id]));
-    // Fill the title from the first ticked service if it is still empty.
-    if (!isOn && !title.trim()) setTitle(task.name);
+    const next = completed.includes(task.id) ? completed.filter((id) => id !== task.id) : [...completed, task.id];
+    setCompleted(next);
+    // Build the title from the ticked items until the user types their own.
+    if (!titleTouched) {
+      setTitle(tasks.filter((t) => next.includes(t.id)).map((t) => t.name).join(', '));
+    }
   };
-
-  const addFilterAsPart = (label: string, partNumber: string) =>
-    setParts((p) => [...p, { name: label, partNumber, quantity: '1' }]);
 
   const setPart = (i: number, patch: Partial<PartUsed>) =>
     setParts((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -90,6 +99,7 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
     Keyboard.dismiss();
     Alert.alert('Service saved', `${title.trim()} logged for ${asset.name}.`);
     setTitle('');
+    setTitleTouched(false);
     setDescription('');
     setParts([]);
     setNotes('');
@@ -98,17 +108,21 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
 
   return (
     <Card>
-      <Field
-        label="Service done by"
-        placeholder="Name"
-        value={performedBy}
-        onChangeText={setPerformedBy}
-        autoCapitalize="words"
-      />
+      <Text style={s.label}>Service done by</Text>
+      {technicians.length > 0 && (
+        <View style={{ marginBottom: spacing.sm }}>
+          <ChipSelect
+            options={technicians.map((t) => ({ value: t.name, label: t.name }))}
+            value={performedBy}
+            onChange={setPerformedBy}
+          />
+        </View>
+      )}
+      <Field label="Or type a name" placeholder="Name" value={performedBy} onChangeText={setPerformedBy} autoCapitalize="words" />
 
       {scheduled.length > 0 && (
-        <View style={styles.block}>
-          <Text style={styles.label}>Scheduled services completed</Text>
+        <View style={s.block}>
+          <Text style={s.label}>Scheduled services completed</Text>
           {scheduled.map((d) => (
             <CheckRow
               key={d.task.id}
@@ -116,9 +130,7 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
               onToggle={() => toggleTask(d.task)}
               title={d.task.name}
               detail={d.detail}
-              detailColor={
-                d.status === 'overdue' ? colors.danger : d.status === 'dueSoon' ? colors.warn : undefined
-              }
+              detailColor={d.level === 'green' ? undefined : levelColor(c, d.level)}
             />
           ))}
         </View>
@@ -128,54 +140,43 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
         label="Service"
         placeholder="e.g. Engine oil and filter"
         value={title}
-        onChangeText={setTitle}
+        onChangeText={(v) => {
+          setTitle(v);
+          setTitleTouched(true);
+        }}
       />
-      <Field
-        label="Description"
-        placeholder="What was done, what was found"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-      />
+      <Field label="Description" placeholder="What was done, what was found" value={description} onChangeText={setDescription} multiline />
 
-      <View style={styles.block}>
-        <Text style={styles.label}>Parts used</Text>
+      <View style={s.block}>
+        <Text style={s.label}>Parts used</Text>
         {asset.specs.filters.length > 0 && (
-          <View style={styles.quickRow}>
+          <View style={s.quickRow}>
             {asset.specs.filters.map((f, i) => (
               <Pressable
                 key={i}
-                onPress={() => addFilterAsPart(f.label, f.partNumber)}
-                style={({ pressed }) => [styles.quick, pressed && { opacity: 0.7 }]}
+                onPress={() => setParts((p) => [...p, { name: f.label, partNumber: f.partNumber, quantity: '1' }])}
+                style={({ pressed }) => [s.quick, pressed && { opacity: 0.7 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`Add ${f.label} ${f.partNumber}`}
               >
-                <Text style={styles.quickText}>+ {f.label}</Text>
+                <Text style={s.quickText}>+ {f.label}</Text>
               </Pressable>
             ))}
           </View>
         )}
         {parts.map((p, i) => (
-          <View key={i} style={styles.partRow}>
-            <TextInput
-              style={[styles.input, { flex: 2 }]}
-              placeholder="Part"
-              placeholderTextColor={colors.muted}
-              value={p.name}
-              onChangeText={(v) => setPart(i, { name: v })}
-            />
-            <TextInput
-              style={[styles.input, { flex: 2 }]}
+          <View key={i} style={s.partRow}>
+            <Input style={{ flex: 2 }} placeholder="Part" value={p.name} onChangeText={(v) => setPart(i, { name: v })} />
+            <Input
+              style={{ flex: 2 }}
               placeholder="Part #"
-              placeholderTextColor={colors.muted}
               autoCapitalize="characters"
               value={p.partNumber}
               onChangeText={(v) => setPart(i, { partNumber: v })}
             />
-            <TextInput
-              style={[styles.input, { width: 56, textAlign: 'center' }]}
+            <Input
+              style={{ width: 56, textAlign: 'center' }}
               placeholder="Qty"
-              placeholderTextColor={colors.muted}
               keyboardType="decimal-pad"
               value={p.quantity}
               onChangeText={(v) => setPart(i, { quantity: v })}
@@ -183,6 +184,7 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
             <Button
               title="✕"
               variant="danger"
+              accessibilityLabel="Remove part"
               style={{ width: touch, paddingHorizontal: 0 }}
               onPress={() => setParts((x) => x.filter((_, j) => j !== i))}
             />
@@ -191,61 +193,36 @@ export function ServiceForm({ asset, tasks, onSubmit }: Props) {
         <Button title="+ Add part" variant="secondary" onPress={() => setParts((p) => [...p, emptyPart()])} />
       </View>
 
-      <View style={styles.twoCol}>
+      <View style={s.twoCol}>
         <View style={{ flex: 1 }}>
-          <Field
-            label="Date (YYYY-MM-DD)"
-            value={dateText}
-            onChangeText={setDateText}
-            keyboardType="numbers-and-punctuation"
-          />
+          <Field label="Date (YYYY-MM-DD)" value={dateText} onChangeText={setDateText} keyboardType="numbers-and-punctuation" />
         </View>
         <View style={{ flex: 1 }}>
-          <Field
-            label="Hours at service"
-            value={hoursText}
-            onChangeText={setHoursText}
-            keyboardType="decimal-pad"
-          />
+          <Field label="Hours at service" value={hoursText} onChangeText={setHoursText} keyboardType="decimal-pad" />
         </View>
       </View>
 
-      <Field
-        label="Notes"
-        placeholder="Anything else (next service, issues found)"
-        value={notes}
-        onChangeText={setNotes}
-        multiline
-      />
+      <Field label="Notes" placeholder="Anything else (next service, issues found)" value={notes} onChangeText={setNotes} multiline />
 
       <Button title="Save service" onPress={submit} />
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  block: { marginBottom: spacing.md },
-  label: { color: colors.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
-  quick: {
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  quickText: { color: colors.accent, fontSize: 15, fontWeight: '700' },
-  partRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
-  input: {
-    minHeight: touch,
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius,
-    paddingHorizontal: spacing.sm,
-    color: colors.text,
-    fontSize: 16,
-  },
-  twoCol: { flexDirection: 'row', gap: spacing.sm },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    block: { marginBottom: spacing.md },
+    label: { color: c.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
+    quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+    quick: {
+      borderWidth: 1,
+      borderColor: c.accent,
+      borderRadius: 999,
+      paddingHorizontal: spacing.md,
+      minHeight: 40,
+      justifyContent: 'center',
+    },
+    quickText: { color: c.accent, fontSize: 15, fontWeight: '700' },
+    partRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
+    twoCol: { flexDirection: 'row', gap: spacing.sm },
+  });
