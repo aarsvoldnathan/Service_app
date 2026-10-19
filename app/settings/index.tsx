@@ -8,7 +8,7 @@ import { Palette, spacing, useStyles } from '../../src/theme';
 export default function SettingsScreen() {
   const s = useStyles(makeStyles);
   const router = useRouter();
-  const { fleets, assets, technicians, activeFleet } = useStore();
+  const { fleets, assets, technicians, activeFleet, categories } = useStore();
 
   return (
     <View style={{ flex: 1 }}>
@@ -30,15 +30,33 @@ export default function SettingsScreen() {
           onPress={() => router.push('/settings/machines')}
         />
         <ListRow
+          title="Equipment categories"
+          subtitle="Skid steer, excavator, trailer… and their spec lines"
+          right={String(categories.length)}
+          onPress={() => router.push('/settings/categories')}
+        />
+        <ListRow
           title="Technicians"
-          subtitle="Employees and family members"
+          subtitle="Employees and family members, hourly rates"
           right={String(technicians.length)}
           onPress={() => router.push('/settings/technicians')}
         />
 
         <View style={{ height: spacing.md }} />
+        <SectionTitle>Crew</SectionTitle>
+        <ListRow
+          title="Crew & sharing"
+          subtitle="Invite someone, send or import a fleet"
+          onPress={() => router.push('/settings/crew')}
+        />
+
+        <View style={{ height: spacing.md }} />
         <SectionTitle>App</SectionTitle>
-        <ListRow title="Preferences and theme" subtitle="Light / dark mode, accent color, who uses this phone" onPress={() => router.push('/settings/preferences')} />
+        <ListRow
+          title="Preferences and invoices"
+          subtitle="Theme, who uses this phone, business info for invoices"
+          onPress={() => router.push('/settings/preferences')}
+        />
       </ScrollView>
     </View>
   );

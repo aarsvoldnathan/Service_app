@@ -23,7 +23,15 @@ export type Technician = {
   role?: string;
   phone?: string;
   email?: string;
+  /** Default hourly rate for jobs and invoices. */
+  hourlyRate?: number;
 };
+
+/** One spec line shown for a category, e.g. "Lug nut torque". */
+export type SpecField = { id: string; label: string; placeholder?: string };
+
+/** Equipment category (skid steer, excavator, trailer...) with its own spec fields. */
+export type Category = { id: string; name: string; fields: SpecField[] };
 
 /** A replacement part number, e.g. { label: 'Oil filter', partNumber: 'HH164-32430' }. */
 export type FilterSpec = {
@@ -33,10 +41,9 @@ export type FilterSpec = {
 
 /** Service specs shown at the top of the service screen. All free text so any unit works. */
 export type AssetSpecs = {
-  lugNutTorque?: string;
-  tirePressure?: string;
-  oilCapacity?: string;
-  oilType?: string;
+  /** Spec values keyed by SpecField id. */
+  values: Record<string, string>;
+  /** Saved parts (filters, belts...) with part numbers. */
   filters: FilterSpec[];
 };
 
@@ -44,6 +51,8 @@ export type AssetSpecs = {
 export type Asset = {
   id: string;
   fleetId: string;
+  /** Category id (skid_steer, excavator, ...). */
+  category: string;
   name: string;
   serial: string;
   /** Value encoded in the machine's barcode / QR sticker. */
@@ -132,10 +141,79 @@ export type Preferences = {
   /** The person using this phone; pre-fills "Service done by". */
   meTechnicianId?: string;
   activeFleetId: string;
+  business: BusinessInfo;
+};
+
+/** Shown on invoices. */
+export type BusinessInfo = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  nextInvoiceNumber: number;
+};
+
+export type ShoppingItem = {
+  id: string;
+  fleetId: string;
+  name: string;
+  partNumber?: string;
+  quantity?: string;
+  assetId?: string;
+  notes?: string;
+  addedBy?: string;
+  createdAt: string;
+  purchased: boolean;
+  purchasedAt?: string;
+};
+
+/** A job or work week: time and expenses that become one invoice. */
+export type Job = {
+  id: string;
+  title: string;
+  /** Bill to. */
+  client?: string;
+  clientContact?: string;
+  technicianId?: string;
+  assetId?: string;
+  rate: number;
+  status: 'open' | 'invoiced' | 'paid';
+  createdAt: string;
+  invoiceNumber?: number;
+  invoicedAt?: string;
+  paidAt?: string;
+  checkNumber?: string;
+  notes?: string;
+};
+
+export type TimeEntry = {
+  id: string;
+  jobId: string;
+  technicianId?: string;
+  /** ISO date. */
+  date: string;
+  hours: number;
+  note?: string;
+};
+
+export type Expense = {
+  id: string;
+  jobId: string;
+  technicianId?: string;
+  date: string;
+  amount: number;
+  description: string;
+  /** Local file of the receipt photo. */
+  receiptUri?: string;
 };
 
 export type AppData = {
-  version: 2;
+  version: 3;
+  categories: Category[];
+  shopping: ShoppingItem[];
+  jobs: Job[];
+  timeEntries: TimeEntry[];
+  expenses: Expense[];
   fleets: Fleet[];
   technicians: Technician[];
   assets: Asset[];

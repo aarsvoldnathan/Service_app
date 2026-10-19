@@ -16,6 +16,8 @@ export type MachineTemplate = {
   make: string;
   model: string;
   type: string;
+  /** Equipment category id. */
+  category: string;
   /** True when every interval was read from the manufacturer's published chart. */
   verified: boolean;
   source: string;
@@ -39,6 +41,7 @@ const bobcatCtl = (model: string, source: string): MachineTemplate => ({
   make: 'Bobcat',
   model,
   type: 'Compact track loader',
+  category: 'skid_steer',
   verified: true,
   source,
   items: [
@@ -62,6 +65,7 @@ const bobcatE35to55 = (model: string): MachineTemplate => ({
   make: 'Bobcat',
   model,
   type: 'Compact excavator',
+  category: 'excavator',
   verified: true,
   source:
     'https://res.cloudinary.com/doosan-bobcat/image/upload/v1650908182/bobcat-assets/na-approved/products/excavators/compact-excavators/service-schedules/ss-exc-e32-e55-t4-b-0118.pdf',
@@ -88,6 +92,7 @@ const bobcatE20: MachineTemplate = {
   make: 'Bobcat',
   model: 'E20',
   type: 'Compact excavator',
+  category: 'excavator',
   verified: true,
   source:
     'https://res.cloudinary.com/doosan-bobcat/image/upload/v1650574486/bobcat-assets/na-approved/products/excavators/compact-excavators/service-schedules/ss-exc-e19-e20-0315.pdf',
@@ -115,6 +120,7 @@ const bobcatMtl = (model: string, source: string, driveMotor: boolean): MachineT
   make: 'Bobcat',
   model,
   type: 'Mini track loader',
+  category: 'skid_steer',
   verified: false,
   source,
   items: [
@@ -160,6 +166,7 @@ export const TEMPLATES: MachineTemplate[] = [
     make: 'Bobcat',
     model: 'T595',
     type: 'Compact track loader',
+    category: 'skid_steer',
     verified: false,
     source: 'https://heavyvehicleinspection.com/blog/post/bobcat-maintenance-schedule',
     items: [
@@ -178,6 +185,7 @@ export const TEMPLATES: MachineTemplate[] = [
     make: 'Kubota',
     model: 'L3901',
     type: 'Tractor',
+    category: 'other',
     verified: false,
     source: 'https://www.tractortechspecs.com/kubota_l3901_tractor_service.html',
     items: [
@@ -199,6 +207,7 @@ export const TEMPLATES: MachineTemplate[] = [
     make: 'Honda',
     model: 'EU7000is',
     type: 'Generator',
+    category: 'other',
     verified: false,
     source: 'https://blog.hondalawnparts.com/servicing-the-eu7000is-generator/',
     items: [

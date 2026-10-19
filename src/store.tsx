@@ -9,6 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { DEFAULT_THRESHOLDS, Thresholds } from './maintenance';
+import { DEFAULT_CATEGORIES, defaultTasksForCategory, LEGACY_SPEC_KEYS } from './categories';
 import { buildSeedData, defaultRoutineTasks } from './seedData';
 import { findTemplate, scheduleFromTemplate, templateLabel } from './templates';
 import { ThemeProvider } from './theme';
@@ -17,12 +18,17 @@ import {
   Asset,
   AssetSpecs,
   Assignment,
+  Category,
+  Expense,
   Fleet,
+  Job,
   NewServiceLog,
   Preferences,
   ServiceLog,
   ServiceTask,
+  ShoppingItem,
   Technician,
+  TimeEntry,
 } from './types';
 
 const STORAGE_KEY = 'service-ceo:v1';
@@ -31,6 +37,27 @@ export const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 type Result = string | null; // error message, or null on success
+
+export type ServiceExtras = {
+  /** Parts to add to the shopping list. */
+  shopping?: { name: string; partNumber?: string; quantity?: string }[];
+  /** Custom parts to save to the machine's parts list. */
+  saveParts?: { label: string; partNumber: string }[];
+};
+
+export type FleetBundle = {
+  kind: 'service-ceo-fleet';
+  version: 3;
+  exportedAt: string;
+  fleet: Fleet;
+  technicians: Technician[];
+  categories: Category[];
+  assets: Asset[];
+  tasks: ServiceTask[];
+  logs: ServiceLog[];
+  assignments: Assignment[];
+  shopping: ShoppingItem[];
+};
 
 type StoreValue = AppData & {
   ready: boolean;
@@ -43,7 +70,8 @@ type StoreValue = AppData & {
   setCurrentAssetId: (id: string | undefined) => void;
 
   updateHours: (assetId: string, hours: number) => Result;
-  addServiceLog: (entry: NewServiceLog) => Result;
+  /** Log a service. Parts can also go to the shopping list and/or be saved to the machine. */
+  addServiceLog: (entry: NewServiceLog, extras?: ServiceExtras) => Result;
   updateSpecs: (assetId: string, specs: AssetSpecs) => void;
 
   saveAsset: (asset: Omit<Asset, 'id'> & { id?: string }) => { error: Result; id?: string };
@@ -65,6 +93,31 @@ type StoreValue = AppData & {
   setAssignmentStatus: (assignmentId: string, status: Assignment['status']) => void;
   deleteAssignment: (id: string) => void;
 
+  saveCategory: (c: Omit<Category, 'id'> & { id?: string }) => Result;
+  deleteCategory: (id: string) => Result;
+  categoryOf: (asset?: Asset) => Category;
+
+  saveShoppingItem: (i: Omit<ShoppingItem, 'id' | 'createdAt' | 'purchased'> & Partial<ShoppingItem>) => Result;
+  toggleShoppingItem: (id: string) => void;
+  deleteShoppingItem: (id: string) => void;
+  clearPurchased: (fleetId: string) => void;
+
+  saveJob: (j: Omit<Job, 'id' | 'createdAt' | 'status'> & Partial<Job>) => { error: Result; id?: string };
+  deleteJob: (id: string) => void;
+  /** Give the job the next invoice number and mark it sent. */
+  markInvoiced: (jobId: string) => number;
+  markPaid: (jobId: string, checkNumber: string) => Result;
+  reopenJob: (jobId: string) => void;
+  saveTimeEntry: (e: Omit<TimeEntry, 'id'> & { id?: string }) => Result;
+  deleteTimeEntry: (id: string) => void;
+  saveExpense: (e: Omit<Expense, 'id'> & { id?: string }) => Result;
+  deleteExpense: (id: string) => void;
+
+  /** Everything about one fleet, to send to another phone. */
+  exportFleet: (fleetId: string) => FleetBundle;
+  /** Merge a fleet received from another phone. Returns a summary or an error. */
+  importFleet: (bundle: unknown) => { error: Result; summary?: string };
+
   setPrefs: (patch: Partial<Preferences>) => void;
   technicianName: (id?: string) => string;
   resetDemoData: () => void;
@@ -75,26 +128,78 @@ const StoreContext = createContext<StoreValue | null>(null);
 // ---------- Loading and upgrading saved data ----------
 
 const DEMO_IDS = new Set(['a1', 'a2', 'a3']);
-const isSampleSpecs = (s?: Partial<AssetSpecs>) =>
+const isSampleSpecs = (s?: any) =>
   !!s &&
-  [s.lugNutTorque, s.tirePressure, s.oilCapacity, s.oilType, ...(s.filters ?? []).map((f) => f.partNumber)]
+  [s.lugNutTorque, s.tirePressure, s.oilCapacity, s.oilType, ...(s.filters ?? []).map((f: any) => f.partNumber)]
     .filter(Boolean)
     .some((v) => /sample/i.test(v as string));
 
 const guessKind = (name: string): ServiceTask['kind'] =>
   /grease|check|clean|inspect|wash/i.test(name) ? 'routine' : 'major';
 
-/** Turn whatever is in storage (old or new format) into the current format. */
+type AppDataV2 = Omit<AppData, 'version' | 'categories' | 'shopping' | 'jobs' | 'timeEntries' | 'expenses'> & {
+  version: 2;
+};
+
+/** Specs from builds before categories: fixed fields -> values map. */
+function toSpecs(old: any): AssetSpecs {
+  if (old?.values) return { values: { ...old.values }, filters: old.filters ?? [] };
+  const values: Record<string, string> = {};
+  LEGACY_SPEC_KEYS.forEach((k) => {
+    if (old?.[k]) values[k] = String(old[k]);
+  });
+  return { values, filters: old?.filters ?? [] };
+}
+
+/** Turn whatever is in storage (any older format) into the current format. */
 function upgrade(raw: any): AppData {
+  if (raw?.version === 3) {
+    const seed = buildSeedData();
+    const d = raw as AppData;
+    const fleets = d.fleets?.length ? d.fleets : seed.fleets;
+    return {
+      ...d,
+      fleets,
+      categories: d.categories?.length ? d.categories : DEFAULT_CATEGORIES,
+      assets: (d.assets ?? []).map((a) => ({ ...a, category: a.category ?? 'other', specs: toSpecs(a.specs) })),
+      shopping: d.shopping ?? [],
+      jobs: d.jobs ?? [],
+      timeEntries: d.timeEntries ?? [],
+      expenses: d.expenses ?? [],
+      prefs: {
+        ...seed.prefs,
+        ...d.prefs,
+        business: { ...seed.prefs.business, name: undefined, ...d.prefs?.business },
+        activeFleetId: fleets.some((f) => f.id === d.prefs?.activeFleetId) ? d.prefs.activeFleetId : fleets[0].id,
+      },
+    };
+  }
+  const v2 = upgradeToV2(raw);
+  const seed = buildSeedData();
+  const categoryFor = (a: Asset) => findTemplate(a.templateId)?.category ?? 'other';
+  return {
+    ...v2,
+    version: 3,
+    categories: DEFAULT_CATEGORIES,
+    assets: v2.assets.map((a) => ({ ...a, category: (a as any).category ?? categoryFor(a), specs: toSpecs(a.specs) })),
+    shopping: [],
+    jobs: [],
+    timeEntries: [],
+    expenses: [],
+    prefs: { ...v2.prefs, business: { nextInvoiceNumber: seed.prefs.business.nextInvoiceNumber } },
+  };
+}
+
+function upgradeToV2(raw: any): AppDataV2 {
   if (raw?.version === 2) {
     const seed = buildSeedData();
-    const data = raw as AppData;
+    const data = raw as AppDataV2;
     const fleets = data.fleets?.length ? data.fleets : seed.fleets;
     return {
       version: 2,
       fleets,
       technicians: data.technicians ?? [],
-      assets: (data.assets ?? []).map((a) => ({ ...a, specs: { ...a.specs, filters: a.specs?.filters ?? [] } })),
+      assets: data.assets ?? [],
       tasks: data.tasks ?? [],
       logs: data.logs ?? [],
       assignments: data.assignments ?? [],
@@ -126,10 +231,10 @@ function upgrade(raw: any): AppData {
         ...a,
         currentHours: keepHours ? old.currentHours : a.currentHours,
         hoursUpdatedAt: keepHours ? old.hoursUpdatedAt : a.hoursUpdatedAt,
-        specs: old.specs && !isSampleSpecs(old.specs) ? { ...old.specs, filters: old.specs.filters ?? [] } : a.specs,
+        specs: old.specs && !isSampleSpecs(old.specs) ? toSpecs(old.specs) : a.specs,
       };
     });
-    return seed;
+    return { ...seed, version: 2 };
   }
 
   // Real machines entered by hand: wrap them in one fleet and add the 10-hour items.
@@ -158,20 +263,20 @@ function upgrade(raw: any): AppData {
       },
     ],
     technicians,
-    assets: oldAssets.map((a) => ({ ...a, fleetId, specs: { ...a.specs, filters: a.specs?.filters ?? [] } })),
+    assets: oldAssets.map((a) => ({ ...a, fleetId, category: 'other', specs: toSpecs(a.specs) })),
     tasks,
     logs: oldLogs,
     assignments: [],
-    prefs: { theme: 'system', accent: 'amber', activeFleetId: fleetId },
+    prefs: { theme: 'system', accent: 'amber', activeFleetId: fleetId, business: { nextInvoiceNumber: 1001 } },
   };
 }
 
 /** Schedule for a newly added machine: its factory template, or the default 10-hour items. */
-function startingTasks(assetId: string, currentHours: number, templateId?: string): ServiceTask[] {
+function startingTasks(assetId: string, currentHours: number, templateId?: string, category?: string): ServiceTask[] {
   const t = findTemplate(templateId);
   const items = t
     ? t.items.map((i) => scheduleFromTemplate(i, currentHours))
-    : defaultRoutineTasks(assetId, currentHours);
+    : defaultTasksForCategory(category, currentHours);
   return items.map((i) => ({ ...i, assetId, id: newId() }));
 }
 
@@ -222,7 +327,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [update]);
 
-  const addServiceLog = useCallback((entry: NewServiceLog): Result => {
+  const addServiceLog = useCallback((entry: NewServiceLog, extras?: ServiceExtras): Result => {
     const asset = ref.current.assets.find((a) => a.id === entry.assetId);
     if (!asset) return 'Select a machine first.';
     if (!entry.performedBy.trim()) return 'Enter who did the service.';
@@ -241,11 +346,30 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       tasks: d.tasks.map((t) =>
         completed.has(t.id) ? { ...t, lastDoneHours: entry.hoursAtService, lastDoneDate: entry.date } : t,
       ),
-      assets: d.assets.map((a) =>
-        a.id === entry.assetId && newest
-          ? { ...a, currentHours: entry.hoursAtService, hoursUpdatedAt: new Date().toISOString() }
-          : a,
-      ),
+      assets: d.assets.map((a) => {
+        if (a.id !== entry.assetId) return a;
+        let next = a;
+        if (newest) next = { ...next, currentHours: entry.hoursAtService, hoursUpdatedAt: new Date().toISOString() };
+        const toSave = (extras?.saveParts ?? []).filter(
+          (p) => !next.specs.filters.some((f) => f.label === p.label && f.partNumber === p.partNumber),
+        );
+        if (toSave.length) next = { ...next, specs: { ...next.specs, filters: [...next.specs.filters, ...toSave] } };
+        return next;
+      }),
+      shopping: [
+        ...(extras?.shopping ?? []).map((p) => ({
+          id: newId(),
+          fleetId: asset.fleetId,
+          name: p.name,
+          partNumber: p.partNumber,
+          quantity: p.quantity,
+          assetId: asset.id,
+          addedBy: entry.performedBy,
+          createdAt: new Date().toISOString(),
+          purchased: false,
+        })),
+        ...d.shopping,
+      ],
     }));
     return null;
   }, [update]);
@@ -281,7 +405,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...d,
       assets: isNew ? [...d.assets, asset] : d.assets.map((a) => (a.id === id ? asset : a)),
       // New machines start with their factory schedule, or the three 10-hour routine items.
-      tasks: isNew ? [...d.tasks, ...startingTasks(id, asset.currentHours, asset.templateId)] : d.tasks,
+      tasks: isNew ? [...d.tasks, ...startingTasks(id, asset.currentHours, asset.templateId, asset.category)] : d.tasks,
     }));
     return { error: null, id };
   }, [update]);
@@ -293,7 +417,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return {
         ...d,
         assets: d.assets.map((a) => (a.id === assetId ? { ...a, templateId } : a)),
-        tasks: [...d.tasks.filter((t) => t.assetId !== assetId), ...startingTasks(assetId, asset.currentHours, templateId)],
+        tasks: [...d.tasks.filter((t) => t.assetId !== assetId), ...startingTasks(assetId, asset.currentHours, templateId, asset.category)],
       };
     });
   }, [update]);
@@ -318,12 +442,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           make: t.make,
           model: t.model,
           templateId,
+          category: t.category,
           serial: '',
           currentHours: 0,
           hoursUpdatedAt: new Date().toISOString(),
-          specs: { filters: [] },
+          specs: { values: {}, filters: [] },
         });
-        newTasks.push(...startingTasks(id, 0, templateId));
+        newTasks.push(...startingTasks(id, 0, templateId, t.category));
       }
     });
     if (newAssets.length) update((d) => ({ ...d, assets: [...d.assets, ...newAssets], tasks: [...d.tasks, ...newTasks] }));
@@ -449,6 +574,212 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((d) => ({ ...d, assignments: d.assignments.filter((a) => a.id !== id) }));
   }, [update]);
 
+  // ----- Categories -----
+
+  const saveCategory = useCallback((input: Omit<Category, 'id'> & { id?: string }): Result => {
+    if (!input.name.trim()) return 'Enter a category name.';
+    const c: Category = {
+      ...input,
+      id: input.id ?? newId(),
+      name: input.name.trim(),
+      fields: input.fields.filter((f) => f.label.trim()).map((f) => ({ ...f, label: f.label.trim() })),
+    };
+    update((d) => ({
+      ...d,
+      categories: d.categories.some((x) => x.id === c.id) ? d.categories.map((x) => (x.id === c.id ? c : x)) : [...d.categories, c],
+    }));
+    return null;
+  }, [update]);
+
+  const deleteCategory = useCallback((id: string): Result => {
+    if (id === 'other') return 'The "Other" category is used as a fallback and cannot be deleted.';
+    const n = ref.current.assets.filter((a) => a.category === id).length;
+    if (n) return `${n} machine${n === 1 ? ' uses' : 's use'} this category. Change them first.`;
+    update((d) => ({ ...d, categories: d.categories.filter((c) => c.id !== id) }));
+    return null;
+  }, [update]);
+
+  // ----- Shopping list -----
+
+  const saveShoppingItem = useCallback(
+    (input: Omit<ShoppingItem, 'id' | 'createdAt' | 'purchased'> & Partial<ShoppingItem>): Result => {
+      if (!input.name.trim() && !input.partNumber?.trim()) return 'Enter a part name or number.';
+      const item: ShoppingItem = {
+        createdAt: new Date().toISOString(),
+        purchased: false,
+        ...input,
+        id: input.id ?? newId(),
+        name: input.name.trim() || (input.partNumber ?? '').trim(),
+      };
+      update((d) => ({
+        ...d,
+        shopping: d.shopping.some((x) => x.id === item.id) ? d.shopping.map((x) => (x.id === item.id ? item : x)) : [item, ...d.shopping],
+      }));
+      return null;
+    },
+    [update],
+  );
+
+  const toggleShoppingItem = useCallback((id: string) => {
+    update((d) => ({
+      ...d,
+      shopping: d.shopping.map((x) =>
+        x.id === id ? { ...x, purchased: !x.purchased, purchasedAt: x.purchased ? undefined : new Date().toISOString() } : x,
+      ),
+    }));
+  }, [update]);
+
+  const deleteShoppingItem = useCallback((id: string) => {
+    update((d) => ({ ...d, shopping: d.shopping.filter((x) => x.id !== id) }));
+  }, [update]);
+
+  const clearPurchased = useCallback((fleetId: string) => {
+    update((d) => ({ ...d, shopping: d.shopping.filter((x) => !(x.fleetId === fleetId && x.purchased)) }));
+  }, [update]);
+
+  // ----- Jobs, time and expenses -----
+
+  const saveJob = useCallback((input: Omit<Job, 'id' | 'createdAt' | 'status'> & Partial<Job>) => {
+    if (!input.title.trim()) return { error: 'Enter a job name.' };
+    if (!Number.isFinite(input.rate) || input.rate < 0) return { error: 'Enter a valid hourly rate.' };
+    const job: Job = { createdAt: new Date().toISOString(), status: 'open', ...input, id: input.id ?? newId(), title: input.title.trim() };
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.some((x) => x.id === job.id) ? d.jobs.map((x) => (x.id === job.id ? job : x)) : [job, ...d.jobs],
+    }));
+    return { error: null, id: job.id };
+  }, [update]);
+
+  const deleteJob = useCallback((id: string) => {
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.filter((j) => j.id !== id),
+      timeEntries: d.timeEntries.filter((t) => t.jobId !== id),
+      expenses: d.expenses.filter((e) => e.jobId !== id),
+    }));
+  }, [update]);
+
+  const markInvoiced = useCallback((jobId: string) => {
+    const job = ref.current.jobs.find((j) => j.id === jobId);
+    const number = job?.invoiceNumber ?? ref.current.prefs.business.nextInvoiceNumber;
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.map((j) =>
+        j.id === jobId
+          ? { ...j, invoiceNumber: number, status: j.status === 'paid' ? 'paid' : 'invoiced', invoicedAt: j.invoicedAt ?? new Date().toISOString() }
+          : j,
+      ),
+      prefs: job?.invoiceNumber ? d.prefs : { ...d.prefs, business: { ...d.prefs.business, nextInvoiceNumber: number + 1 } },
+    }));
+    return number;
+  }, [update]);
+
+  const markPaid = useCallback((jobId: string, checkNumber: string): Result => {
+    if (!checkNumber.trim()) return 'Enter the check number (or "cash", "card", etc.).';
+    const job = ref.current.jobs.find((j) => j.id === jobId);
+    const number = job?.invoiceNumber ?? ref.current.prefs.business.nextInvoiceNumber;
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.map((j) =>
+        j.id === jobId
+          ? { ...j, status: 'paid', checkNumber: checkNumber.trim(), paidAt: new Date().toISOString(), invoiceNumber: number, invoicedAt: j.invoicedAt ?? new Date().toISOString() }
+          : j,
+      ),
+      prefs: job?.invoiceNumber ? d.prefs : { ...d.prefs, business: { ...d.prefs.business, nextInvoiceNumber: number + 1 } },
+    }));
+    return null;
+  }, [update]);
+
+  const reopenJob = useCallback((jobId: string) => {
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.map((j) => (j.id === jobId ? { ...j, status: 'open', paidAt: undefined, checkNumber: undefined } : j)),
+    }));
+  }, [update]);
+
+  const saveTimeEntry = useCallback((input: Omit<TimeEntry, 'id'> & { id?: string }): Result => {
+    if (!Number.isFinite(input.hours) || input.hours <= 0 || input.hours > 24) return 'Enter hours between 0 and 24.';
+    if (Number.isNaN(new Date(input.date).getTime())) return 'Enter a valid date.';
+    const e: TimeEntry = { ...input, id: input.id ?? newId() };
+    update((d) => ({
+      ...d,
+      timeEntries: d.timeEntries.some((x) => x.id === e.id) ? d.timeEntries.map((x) => (x.id === e.id ? e : x)) : [...d.timeEntries, e],
+    }));
+    return null;
+  }, [update]);
+
+  const deleteTimeEntry = useCallback((id: string) => {
+    update((d) => ({ ...d, timeEntries: d.timeEntries.filter((x) => x.id !== id) }));
+  }, [update]);
+
+  const saveExpense = useCallback((input: Omit<Expense, 'id'> & { id?: string }): Result => {
+    if (!Number.isFinite(input.amount) || input.amount <= 0) return 'Enter the amount.';
+    if (!input.description.trim()) return 'Describe the expense.';
+    if (Number.isNaN(new Date(input.date).getTime())) return 'Enter a valid date.';
+    const e: Expense = { ...input, id: input.id ?? newId(), description: input.description.trim() };
+    update((d) => ({
+      ...d,
+      expenses: d.expenses.some((x) => x.id === e.id) ? d.expenses.map((x) => (x.id === e.id ? e : x)) : [...d.expenses, e],
+    }));
+    return null;
+  }, [update]);
+
+  const deleteExpense = useCallback((id: string) => {
+    update((d) => ({ ...d, expenses: d.expenses.filter((x) => x.id !== id) }));
+  }, [update]);
+
+  // ----- Sharing a fleet between phones -----
+
+  const exportFleet = useCallback((fleetId: string): FleetBundle => {
+    const d = ref.current;
+    const fleet = d.fleets.find((f) => f.id === fleetId) ?? d.fleets[0];
+    const assets = d.assets.filter((a) => a.fleetId === fleet.id);
+    const ids = new Set(assets.map((a) => a.id));
+    const usedCats = new Set(assets.map((a) => a.category));
+    return {
+      kind: 'service-ceo-fleet',
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      fleet,
+      technicians: d.technicians.filter((t) => fleet.memberIds.includes(t.id)),
+      categories: d.categories.filter((c) => usedCats.has(c.id)),
+      assets,
+      tasks: d.tasks.filter((t) => ids.has(t.assetId)),
+      logs: d.logs.filter((l) => ids.has(l.assetId)),
+      assignments: d.assignments.filter((a) => ids.has(a.assetId)),
+      shopping: d.shopping.filter((s) => s.fleetId === fleet.id),
+    };
+  }, []);
+
+  const importFleet = useCallback((raw: unknown) => {
+    const b = raw as FleetBundle;
+    if (!b || b.kind !== 'service-ceo-fleet' || !b.fleet || !Array.isArray(b.assets)) {
+      return { error: 'This file is not a Service Ceo fleet.' };
+    }
+    const merge = <T extends { id: string }>(mine: T[], theirs: T[] = []) => {
+      const byId = new Map(mine.map((x) => [x.id, x]));
+      theirs.forEach((x) => byId.set(x.id, x));
+      return Array.from(byId.values());
+    };
+    const assets = b.assets.map((a) => ({ ...a, category: a.category ?? 'other', specs: toSpecs(a.specs) }));
+    update((d) => ({
+      ...d,
+      fleets: merge(d.fleets, [b.fleet]),
+      technicians: merge(d.technicians, b.technicians),
+      categories: merge(d.categories, b.categories),
+      assets: merge(d.assets, assets),
+      tasks: merge(d.tasks, b.tasks),
+      logs: merge(d.logs, b.logs),
+      assignments: merge(d.assignments, b.assignments),
+      shopping: merge(d.shopping, b.shopping),
+      prefs: { ...d.prefs, activeFleetId: b.fleet.id },
+    }));
+    return {
+      error: null,
+      summary: `${b.fleet.name}: ${assets.length} machines, ${(b.technicians ?? []).length} crew members, ${(b.logs ?? []).length} service records.`,
+    };
+  }, [update]);
+
   // ----- Preferences -----
 
   const setPrefs = useCallback((patch: Partial<Preferences>) => {
@@ -489,6 +820,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleChecklistItem,
       setAssignmentStatus,
       deleteAssignment,
+      saveCategory,
+      deleteCategory,
+      categoryOf: (asset?: Asset) =>
+        data.categories.find((c) => c.id === asset?.category) ??
+        data.categories.find((c) => c.id === 'other') ??
+        DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1],
+      saveShoppingItem,
+      toggleShoppingItem,
+      deleteShoppingItem,
+      clearPurchased,
+      saveJob,
+      deleteJob,
+      markInvoiced,
+      markPaid,
+      reopenJob,
+      saveTimeEntry,
+      deleteTimeEntry,
+      saveExpense,
+      deleteExpense,
+      exportFleet,
+      importFleet,
       setPrefs,
       technicianName: techName,
       resetDemoData,
@@ -497,6 +849,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     data, ready, currentAssetId, updateHours, addServiceLog, updateSpecs, saveAsset, deleteAsset, applyTemplate, quickAdd,
     saveTask, deleteTask, saveFleet, deleteFleet, saveTechnician, deleteTechnician, saveAssignment,
     toggleChecklistItem, setAssignmentStatus, deleteAssignment, setPrefs, resetDemoData,
+    saveCategory, deleteCategory, saveShoppingItem, toggleShoppingItem, deleteShoppingItem, clearPurchased,
+    saveJob, deleteJob, markInvoiced, markPaid, reopenJob, saveTimeEntry, deleteTimeEntry, saveExpense, deleteExpense,
+    exportFleet, importFleet,
   ]);
 
   return (

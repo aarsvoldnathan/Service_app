@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, ChipSelect, levelColor, ListRow, Muted } from '../../src/components/ui';
+import { Button, ChipSelect, levelColor, ListRow, Muted, SectionTitle } from '../../src/components/ui';
 import { machineStatus } from '../../src/maintenance';
 import { useStore } from '../../src/store';
 import { spacing, useStyles, useTheme } from '../../src/theme';
@@ -10,7 +10,7 @@ export default function MachinesScreen() {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
-  const { assets, fleets, tasks, activeFleet } = useStore();
+  const { assets, fleets, tasks, activeFleet, categories } = useStore();
   const [fleetId, setFleetId] = useState<string>(activeFleet.id);
 
   const list = assets.filter((a) => fleetId === 'all' || a.fleetId === fleetId).sort((a, b) => a.name.localeCompare(b.name));
@@ -28,7 +28,13 @@ export default function MachinesScreen() {
           />
         </View>
         {list.length === 0 ? <Muted>No machines here yet.</Muted> : null}
-        {list.map((a) => {
+        {categories
+          .map((cat) => ({ cat, items: list.filter((a) => a.category === cat.id || (!categories.some((c) => c.id === a.category) && cat.id === 'other')) }))
+          .filter((g) => g.items.length > 0)
+          .map(({ cat, items }) => (
+            <View key={cat.id} style={{ marginBottom: spacing.md }}>
+              <SectionTitle>{`${cat.name} (${items.length})`}</SectionTitle>
+        {items.map((a) => {
           const f = fleetOf(a.fleetId);
           const th = f ? { orangeOverdueHours: f.orangeOverdueHours, majorWarnHours: f.majorWarnHours } : undefined;
           return (
@@ -42,6 +48,8 @@ export default function MachinesScreen() {
             />
           );
         })}
+            </View>
+          ))}
         <Button
           title="+ Add machine"
           onPress={() =>

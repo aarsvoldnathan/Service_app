@@ -1,3 +1,4 @@
+import { DEFAULT_CATEGORIES } from './categories';
 import { AppData, ServiceTask, TaskKind } from './types';
 
 const DAY = 86_400_000;
@@ -97,7 +98,8 @@ export function buildSeedData(): AppData {
   const bobcatGrease = tasks.find((t) => t.assetId === 'a3' && t.kind === 'routine' && t.name.startsWith('Grease'));
 
   return {
-    version: 2,
+    version: 3,
+    categories: DEFAULT_CATEGORIES,
     fleets: [
       {
         id: 'f-work',
@@ -130,6 +132,7 @@ export function buildSeedData(): AppData {
       {
         id: 'a1',
         templateId: 'kubota-l3901',
+        category: 'other',
         fleetId: 'f-work',
         name: 'Kubota L3901 Tractor',
         make: 'Kubota',
@@ -139,8 +142,7 @@ export function buildSeedData(): AppData {
         currentHours: 412,
         hoursUpdatedAt: daysAgo(2),
         specs: {
-          oilCapacity: '1.75 gal (6.7 L)',
-          oilType: '10W-30 or 15W-40, API CJ-4 / CI-4',
+          values: { oilCapacity: '1.75 gal (6.7 L)', oilType: '10W-30 or 15W-40, API CJ-4 / CI-4' },
           filters: [
             { label: 'Engine oil filter', partNumber: 'HH164-32430' },
             { label: 'Fuel filter', partNumber: '1J800-43172' },
@@ -153,6 +155,7 @@ export function buildSeedData(): AppData {
       {
         id: 'a3',
         templateId: 'bobcat-t595',
+        category: 'skid_steer',
         fleetId: 'f-work',
         name: 'Bobcat T595 Track Loader',
         make: 'Bobcat',
@@ -161,11 +164,12 @@ export function buildSeedData(): AppData {
         barcode: 'SC-0003',
         currentHours: 1264,
         hoursUpdatedAt: daysAgo(9),
-        specs: { filters: [] },
+        specs: { values: {}, filters: [] },
       },
       {
         id: 'a2',
         templateId: 'honda-eu7000is',
+        category: 'other',
         fleetId: 'f-home',
         name: 'Honda EU7000is Generator',
         make: 'Honda',
@@ -175,8 +179,7 @@ export function buildSeedData(): AppData {
         currentHours: 188,
         hoursUpdatedAt: daysAgo(12),
         specs: {
-          oilCapacity: 'About 1.2 qt (1.1 L)',
-          oilType: 'SAE 10W-30, API SJ or later',
+          values: { oilCapacity: 'About 1.2 qt (1.1 L)', oilType: 'SAE 10W-30, API SJ or later' },
           filters: [],
         },
       },
@@ -224,6 +227,72 @@ export function buildSeedData(): AppData {
         status: 'open',
       },
     ],
-    prefs: { theme: 'system', accent: 'amber', meTechnicianId: 'tech-1', activeFleetId: 'f-work' },
+    shopping: [
+      {
+        id: 'sh1',
+        fleetId: 'f-work',
+        name: 'Engine oil filter',
+        partNumber: 'HH164-32430',
+        quantity: '2',
+        assetId: 'a1',
+        addedBy: 'Sam R.',
+        createdAt: daysAgo(1),
+        purchased: false,
+      },
+      {
+        id: 'sh2',
+        fleetId: 'f-work',
+        name: '15W-40 engine oil',
+        quantity: '2 gal',
+        addedBy: 'Nate',
+        createdAt: daysAgo(2),
+        purchased: false,
+      },
+    ],
+    jobs: [
+      {
+        id: 'job1',
+        title: 'Bobcat T595 service and repairs',
+        client: 'Demo Customer LLC',
+        clientContact: 'demo@example.com',
+        technicianId: 'tech-3',
+        assetId: 'a3',
+        rate: 85,
+        status: 'open',
+        createdAt: daysAgo(5),
+      },
+      {
+        id: 'job2',
+        title: 'Week of shop work',
+        client: 'Rental Fleet (internal)',
+        technicianId: 'tech-2',
+        rate: 32,
+        status: 'paid',
+        createdAt: daysAgo(40),
+        invoiceNumber: 1001,
+        invoicedAt: daysAgo(33),
+        paidAt: daysAgo(30),
+        checkNumber: '4521',
+      },
+    ],
+    timeEntries: [
+      { id: 'te1', jobId: 'job1', technicianId: 'tech-3', date: daysAgo(5), hours: 3.5, note: 'Oil and filter, grease' },
+      { id: 'te2', jobId: 'job1', technicianId: 'tech-3', date: daysAgo(4), hours: 2, note: 'Replaced hydraulic hose' },
+      { id: 'te3', jobId: 'job2', technicianId: 'tech-2', date: daysAgo(40), hours: 8 },
+      { id: 'te4', jobId: 'job2', technicianId: 'tech-2', date: daysAgo(39), hours: 8 },
+      { id: 'te5', jobId: 'job2', technicianId: 'tech-2', date: daysAgo(38), hours: 7.5 },
+      { id: 'te6', jobId: 'job2', technicianId: 'tech-2', date: daysAgo(70), hours: 6 },
+    ],
+    expenses: [
+      { id: 'ex1', jobId: 'job1', technicianId: 'tech-3', date: daysAgo(4), amount: 64.18, description: 'Hydraulic hose and fittings' },
+      { id: 'ex2', jobId: 'job2', technicianId: 'tech-2', date: daysAgo(39), amount: 42.5, description: 'Shop supplies' },
+    ],
+    prefs: {
+      theme: 'system',
+      accent: 'amber',
+      meTechnicianId: 'tech-1',
+      activeFleetId: 'f-work',
+      business: { name: 'Service Ceo Demo', nextInvoiceNumber: 1002 },
+    },
   };
 }

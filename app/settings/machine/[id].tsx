@@ -15,7 +15,7 @@ export default function MachineEditScreen() {
   const s = useStyles(makeStyles);
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; barcode?: string; fleetId?: string }>();
-  const { assets, fleets, activeFleet, saveAsset, deleteAsset, applyTemplate } = useStore();
+  const { assets, fleets, categories, activeFleet, saveAsset, deleteAsset, applyTemplate } = useStore();
   // After adding a new machine we stay on this screen and switch to editing it.
   const [createdId, setCreatedId] = useState<string | undefined>();
   const existing = assets.find((a) => a.id === (createdId ?? params.id));
@@ -32,12 +32,21 @@ export default function MachineEditScreen() {
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [scan, setScan] = useState<ScanTarget>(null);
   const [templateId, setTemplateId] = useState<string | undefined>(existing?.templateId);
+  const [category, setCategory] = useState<string | undefined>(existing?.category);
   const template = findTemplate(templateId);
+  const categoryTemplates = TEMPLATES.filter((t) => t.category === category);
+
+  const pickCategory = (id: string) => {
+    setCategory(id);
+    // A model from another category no longer fits.
+    if (findTemplate(templateId)?.category !== id) setTemplateId(undefined);
+  };
 
   const pickTemplate = (id: string) => {
     const t = findTemplate(id);
     setTemplateId(id);
     if (!t) return;
+    setCategory(t.category);
     if (!make.trim()) setMake(t.make);
     if (!model.trim()) setModel(t.model);
     if (!name.trim()) setName(templateLabel(t));
@@ -56,6 +65,10 @@ export default function MachineEditScreen() {
   };
 
   const save = () => {
+    if (!category) {
+      Alert.alert('Choose the type of equipment', 'Pick skid steer, excavator, trailer and so on at the top.');
+      return;
+    }
     const h = Number(hours.replace(',', '.'));
     if (!Number.isFinite(h) || h < 0) {
       Alert.alert('Check the hours', 'Enter the current hour meter reading.');
@@ -70,11 +83,12 @@ export default function MachineEditScreen() {
       model: model.trim() || undefined,
       year: year.trim() || undefined,
       templateId: existing ? existing.templateId : templateId,
+      category,
       serial,
       barcode,
       currentHours: h,
       hoursUpdatedAt: hoursChanged ? new Date().toISOString() : existing!.hoursUpdatedAt,
-      specs: existing?.specs ?? { filters: [] },
+      specs: existing?.specs ?? { values: {}, filters: [] },
       notes: notes.trim() || undefined,
     });
     if (error) {
@@ -88,7 +102,7 @@ export default function MachineEditScreen() {
         'Machine added',
         template
           ? `The ${templateLabel(template)} factory schedule was added. Review it below.`
-          : 'Clean filters, check fluids and grease were added at every 10 hours. Add the rest of the schedule below.',
+          : 'Starter service items for this type of equipment were added. Add the rest of the schedule below.',
       );
     } else {
       router.back();
@@ -117,13 +131,25 @@ export default function MachineEditScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
       <Stack.Screen options={{ title: isNew ? 'New machine' : 'Edit machine' }} />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <SectionTitle>What kind of equipment?</SectionTitle>
+        <Card style={{ marginBottom: spacing.lg }}>
+          <ChipSelect options={categories.map((c) => ({ value: c.id, label: c.name }))} value={category} onChange={pickCategory} />
+          <Text style={s.help}>Sets which service specs are shown. Edit categories in Settings › Equipment categories.</Text>
+        </Card>
+
+        {category && (
+        <>
         <SectionTitle>Model (factory schedule)</SectionTitle>
         <Card style={{ marginBottom: spacing.lg }}>
-          <ChipSelect
-            options={TEMPLATES.map((t) => ({ value: t.id, label: templateLabel(t) }))}
-            value={templateId}
-            onChange={pickTemplate}
-          />
+          {categoryTemplates.length > 0 ? (
+            <ChipSelect
+              options={categoryTemplates.map((t) => ({ value: t.id, label: templateLabel(t) }))}
+              value={templateId}
+              onChange={pickTemplate}
+            />
+          ) : (
+            <Text style={s.help}>No factory schedules saved for this type yet.</Text>
+          )}
           {template ? (
             <Text style={s.help}>
               {template.type} · {template.items.length} service items.{' '}
@@ -132,12 +158,14 @@ export default function MachineEditScreen() {
                 : 'Some intervals could not be confirmed from the manufacturer’s chart — check the decal on your machine.'}
             </Text>
           ) : (
-            <Text style={s.help}>Pick a model to load its factory service schedule. Leave blank for the 10-hour basics only.</Text>
+            <Text style={s.help}>Pick a model to load its factory service schedule, or leave blank for the starter items.</Text>
           )}
           {!isNew && template && (
             <Button title={`Load ${templateLabel(template)} schedule`} variant="secondary" onPress={loadTemplate} style={{ marginTop: spacing.sm }} />
           )}
         </Card>
+        </>
+        )}
 
         <Card>
           <Field label="Machine name" placeholder="e.g. Bobcat T66 #1" value={name} onChangeText={setName} />

@@ -27,6 +27,13 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Service Ceo uses your photos to attach receipt pictures to expenses.",
+          "cameraPermission": "Service Ceo uses the camera to scan machine barcodes and photograph receipts."
+        }
       ]
     ]
   }

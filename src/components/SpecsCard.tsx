@@ -1,28 +1,23 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Palette, spacing, touch, useStyles } from '../theme';
-import { Asset, AssetSpecs, FilterSpec } from '../types';
+import { Asset, AssetSpecs, Category, FilterSpec } from '../types';
 import { Button, Card, Field, Input } from './ui';
 
 type Props = {
   asset: Asset;
+  category: Category;
   onSave: (specs: AssetSpecs) => void;
 };
 
-const ROWS: { key: Exclude<keyof AssetSpecs, 'filters'>; label: string; placeholder: string }[] = [
-  { key: 'lugNutTorque', label: 'Lug nut torque', placeholder: 'e.g. 120 ft-lb' },
-  { key: 'tirePressure', label: 'Tire pressure', placeholder: 'e.g. Front 35 / Rear 40 psi' },
-  { key: 'oilCapacity', label: 'Oil capacity', placeholder: 'e.g. 6.5 qt with filter' },
-  { key: 'oilType', label: 'Oil type', placeholder: 'e.g. 15W-40' },
-];
-
-export function SpecsCard({ asset, onSave }: Props) {
+/** Spec values for the machine's category plus its saved parts list. */
+export function SpecsCard({ asset, category, onSave }: Props) {
   const s = useStyles(makeStyles);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AssetSpecs>(asset.specs);
 
   const startEdit = () => {
-    setDraft({ ...asset.specs, filters: asset.specs.filters.map((f) => ({ ...f })) });
+    setDraft({ values: { ...asset.specs.values }, filters: asset.specs.filters.map((f) => ({ ...f })) });
     setEditing(true);
   };
 
@@ -30,7 +25,11 @@ export function SpecsCard({ asset, onSave }: Props) {
     const filters = draft.filters
       .map((f) => ({ label: f.label.trim(), partNumber: f.partNumber.trim() }))
       .filter((f) => f.label || f.partNumber);
-    onSave({ ...draft, filters });
+    const values: Record<string, string> = {};
+    Object.entries(draft.values).forEach(([k, v]) => {
+      if (v.trim()) values[k] = v.trim();
+    });
+    onSave({ values, filters });
     setEditing(false);
   };
 
@@ -40,19 +39,20 @@ export function SpecsCard({ asset, onSave }: Props) {
   if (editing) {
     return (
       <Card>
-        {ROWS.map((r) => (
+        <Text style={s.catName}>{category.name}</Text>
+        {category.fields.map((f) => (
           <Field
-            key={r.key}
-            label={r.label}
-            placeholder={r.placeholder}
-            value={draft[r.key] ?? ''}
-            onChangeText={(v) => setDraft((d) => ({ ...d, [r.key]: v }))}
+            key={f.id}
+            label={f.label}
+            placeholder={f.placeholder}
+            value={draft.values[f.id] ?? ''}
+            onChangeText={(v) => setDraft((d) => ({ ...d, values: { ...d.values, [f.id]: v } }))}
           />
         ))}
-        <Text style={s.label}>Filters and part numbers</Text>
+        <Text style={s.label}>Saved parts and part numbers</Text>
         {draft.filters.map((f, i) => (
           <View key={i} style={s.filterEditRow}>
-            <Input style={{ flex: 1 }} placeholder="Filter (e.g. Oil filter)" value={f.label} onChangeText={(v) => setFilter(i, { label: v })} />
+            <Input style={{ flex: 1 }} placeholder="Part (e.g. Oil filter)" value={f.label} onChangeText={(v) => setFilter(i, { label: v })} />
             <Input
               style={{ flex: 1 }}
               placeholder="Part number"
@@ -64,16 +64,17 @@ export function SpecsCard({ asset, onSave }: Props) {
               title="✕"
               variant="danger"
               style={{ width: touch, paddingHorizontal: 0 }}
-              accessibilityLabel="Remove filter"
+              accessibilityLabel="Remove part"
               onPress={() => setDraft((d) => ({ ...d, filters: d.filters.filter((_, j) => j !== i) }))}
             />
           </View>
         ))}
         <Button
-          title="+ Add filter"
+          title="+ Add part"
           variant="secondary"
           onPress={() => setDraft((d) => ({ ...d, filters: [...d.filters, { label: '', partNumber: '' }] }))}
         />
+        <Text style={s.note}>Change which spec lines appear in Settings › Equipment categories.</Text>
         <View style={s.actions}>
           <Button title="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => setEditing(false)} />
           <Button title="Save specs" style={{ flex: 1 }} onPress={save} />
@@ -85,15 +86,16 @@ export function SpecsCard({ asset, onSave }: Props) {
   const { specs } = asset;
   return (
     <Card>
+      <Text style={s.catName}>{category.name}</Text>
       <View style={s.grid}>
-        {ROWS.map((r) => (
-          <View key={r.key} style={s.cell}>
-            <Text style={s.cellLabel}>{r.label}</Text>
-            <Text style={[s.cellValue, !specs[r.key] && s.missing]}>{specs[r.key] || 'Not set'}</Text>
+        {category.fields.map((f) => (
+          <View key={f.id} style={s.cell}>
+            <Text style={s.cellLabel}>{f.label}</Text>
+            <Text style={[s.cellValue, !specs.values[f.id] && s.missing]}>{specs.values[f.id] || 'Not set'}</Text>
           </View>
         ))}
       </View>
-      <Text style={[s.cellLabel, { marginTop: spacing.sm }]}>Filters and part numbers</Text>
+      <Text style={[s.cellLabel, { marginTop: spacing.sm }]}>Saved parts and part numbers</Text>
       {specs.filters.length === 0 ? (
         <Text style={[s.cellValue, s.missing]}>None added</Text>
       ) : (
@@ -115,6 +117,7 @@ export function SpecsCard({ asset, onSave }: Props) {
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
+    catName: { color: c.accent, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.sm },
     grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -spacing.xs },
     cell: { width: '50%', paddingHorizontal: spacing.xs, marginBottom: spacing.md },
     cellLabel: {

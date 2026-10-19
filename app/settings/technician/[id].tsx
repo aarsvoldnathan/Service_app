@@ -17,6 +17,7 @@ export default function TechnicianEditScreen() {
   const [role, setRole] = useState(existing?.role ?? '');
   const [phone, setPhone] = useState(existing?.phone ?? '');
   const [email, setEmail] = useState(existing?.email ?? '');
+  const [rate, setRate] = useState(existing?.hourlyRate !== undefined ? String(existing.hourlyRate) : '');
   const [fleetIds, setFleetIds] = useState<string[]>(
     existing ? fleets.filter((f) => f.memberIds.includes(existing.id)).map((f) => f.id) : [],
   );
@@ -29,6 +30,7 @@ export default function TechnicianEditScreen() {
       role: role.trim() || undefined,
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
+      hourlyRate: rate.trim() && Number.isFinite(Number(rate.replace(/[$,]/g, ''))) ? Number(rate.replace(/[$,]/g, '')) : undefined,
     });
     if (error || !techId) {
       Alert.alert('Cannot save', error ?? 'Unknown error');
@@ -69,6 +71,7 @@ export default function TechnicianEditScreen() {
           <Field label="Role" placeholder="e.g. Technician, Shop lead, Family" value={role} onChangeText={setRole} />
           <Field label="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <Field label="Email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+          <Field label="Hourly rate ($)" keyboardType="decimal-pad" placeholder="Used for new jobs" value={rate} onChangeText={setRate} />
           <CheckRow checked={isMe} onToggle={() => setIsMe((v) => !v)} title="This is me" detail="Pre-fills “Service done by” on this phone" />
         </Card>
 

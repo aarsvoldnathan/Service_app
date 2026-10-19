@@ -15,6 +15,7 @@ import { AssignmentCard } from '../src/components/AssignmentCard';
 import { DueRow } from '../src/components/DueRow';
 import { HoursRow } from '../src/components/HoursRow';
 import { Tile } from '../src/components/Tile';
+import { UpdateBanner } from '../src/components/UpdateBanner';
 import { Button, HeaderButton, ListRow, Muted, SectionTitle } from '../src/components/ui';
 import { getDueList, getRecentLogs, getStaleAssets, machineStatus } from '../src/maintenance';
 import { useStore } from '../src/store';
@@ -26,7 +27,7 @@ export default function Dashboard() {
   const router = useRouter();
   const {
     ready, fleets, activeFleet, fleetAssets, tasks, logs, assignments, thresholds, prefs,
-    updateHours, setPrefs, technicianName,
+    updateHours, setPrefs, technicianName, shopping, jobs,
   } = useStore();
   const [fleetMenu, setFleetMenu] = useState(false);
 
@@ -76,6 +77,7 @@ export default function Dashboard() {
         }}
       />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <UpdateBanner />
         <View style={s.tiles}>
           <Tile label="Need service" value={needing.length} color={needing.length ? c.danger : c.ok} onPress={() => router.push('/status')} />
           <Tile label="Overdue items" value={overdue.length} color={c.orange} onPress={() => router.push('/status')} />
@@ -83,13 +85,25 @@ export default function Dashboard() {
         </View>
 
         <Button title="Log a service" onPress={() => openService()} style={{ marginBottom: spacing.sm }} />
-        <View style={s.buttonRow}>
-          <Button title="Fleet status" variant="secondary" style={{ flex: 1 }} onPress={() => router.push('/status')} />
+        <View style={s.grid}>
+          <Button title="Fleet status" variant="secondary" style={s.gridItem} onPress={() => router.push('/status')} />
           <Button
             title="Find / scan"
             variant="secondary"
-            style={{ flex: 1 }}
+            style={s.gridItem}
             onPress={() => router.push({ pathname: '/find', params: { next: 'service' } })}
+          />
+          <Button
+            title={`Shopping list (${shopping.filter((i) => !i.purchased && i.fleetId === activeFleet.id).length})`}
+            variant="secondary"
+            style={s.gridItem}
+            onPress={() => router.push('/shopping')}
+          />
+          <Button
+            title={`Jobs & time (${jobs.filter((j) => j.status !== 'paid').length})`}
+            variant="secondary"
+            style={s.gridItem}
+            onPress={() => router.push('/jobs')}
           />
         </View>
 
@@ -176,7 +190,8 @@ const makeStyles = (c: Palette) =>
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg },
     content: { padding: spacing.md, paddingBottom: spacing.lg * 2 },
     tiles: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-    buttonRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+    gridItem: { flexBasis: '47%', flexGrow: 1 },
     section: { marginBottom: spacing.lg },
     fleetButton: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220 },
     fleetName: { color: c.text, fontSize: 18, fontWeight: '800' },

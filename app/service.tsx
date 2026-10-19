@@ -19,7 +19,7 @@ export default function ServiceScreen() {
   const store = useStore();
   const {
     fleetAssets, tasks, logs, assignments, technicians, activeFleet, thresholds, prefs,
-    currentAssetId, setCurrentAssetId, addServiceLog, updateSpecs, updateHours,
+    currentAssetId, setCurrentAssetId, addServiceLog, updateSpecs, updateHours, categoryOf, shopping,
   } = store;
   const [showIntervals, setShowIntervals] = useState(false);
 
@@ -110,8 +110,16 @@ export default function ServiceScreen() {
             )}
 
             <View style={s.section}>
-              <SectionTitle>Service specs</SectionTitle>
-              <SpecsCard key={asset.id} asset={asset} onSave={(specs) => updateSpecs(asset.id, specs)} />
+              <SectionTitle
+                right={
+                  <Pressable onPress={() => router.push({ pathname: '/shopping', params: { assetId: asset.id } })} accessibilityRole="button" hitSlop={8}>
+                    <Text style={s.link}>Shopping list ({shopping.filter((x) => !x.purchased && x.fleetId === activeFleet.id).length}) ›</Text>
+                  </Pressable>
+                }
+              >
+                Service specs
+              </SectionTitle>
+              <SpecsCard key={asset.id} asset={asset} category={categoryOf(asset)} onSave={(specs) => updateSpecs(asset.id, specs)} />
               <Card style={{ marginTop: spacing.sm }}>
                 <Pressable
                   onPress={() => setShowIntervals((v) => !v)}
@@ -204,6 +212,7 @@ const makeStyles = (c: Palette) =>
     statusDot: { width: 12, height: 12, borderRadius: 6 },
     statusText: { fontSize: 15, fontWeight: '800' },
     section: { marginBottom: spacing.lg },
+    link: { color: c.accent, fontSize: 14, fontWeight: '700' },
     intervalHead: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
     intervalTitle: { color: c.text, fontSize: 17, fontWeight: '800' },
     intervalSub: { color: c.muted, fontSize: 14, marginTop: 2 },

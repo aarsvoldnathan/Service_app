@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { computeDue, Thresholds } from '../maintenance';
 import { Palette, spacing, touch, useStyles, useTheme } from '../theme';
+import type { ServiceExtras } from '../store';
 import { Asset, NewServiceLog, PartUsed, ServiceTask, Technician } from '../types';
 import { Button, Card, CheckRow, ChipSelect, Field, Input, levelColor } from './ui';
 
@@ -11,8 +12,11 @@ type Props = {
   thresholds: Thresholds;
   technicians: Technician[];
   defaultTechnicianId?: string;
-  onSubmit: (entry: NewServiceLog) => string | null;
+  onSubmit: (entry: NewServiceLog, extras?: ServiceExtras) => string | null;
 };
+
+/** A part row in the form, with what else to do with it. */
+type PartRow = PartUsed & { toShopping?: boolean; saveToMachine?: boolean };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const todayText = () => {
@@ -31,7 +35,7 @@ function parseDate(text: string): string | null {
   return date.toISOString();
 }
 
-const emptyPart = (): PartUsed => ({ name: '', partNumber: '', quantity: '1' });
+const emptyPart = (): PartRow => ({ name: '', partNumber: '', quantity: '1' });
 
 export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTechnicianId, onSubmit }: Props) {
   const s = useStyles(makeStyles);
@@ -41,7 +45,7 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [description, setDescription] = useState('');
-  const [parts, setParts] = useState<PartUsed[]>([]);
+  const [parts, setParts] = useState<PartRow[]>([]);
   const [dateText, setDateText] = useState(todayText());
   const [hoursText, setHoursText] = useState(String(asset.currentHours));
   const [notes, setNotes] = useState('');
@@ -64,7 +68,12 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
     }
   };
 
-  const setPart = (i: number, patch: Partial<PartUsed>) =>
+  const isSaved = (p: PartRow) =>
+    asset.specs.filters.some(
+      (f) => f.label.trim().toLowerCase() === p.name.trim().toLowerCase() && f.partNumber.trim() === (p.partNumber ?? '').trim(),
+    );
+
+  const setPart = (i: number, patch: Partial<PartRow>) =>
     setParts((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
   const submit = () => {
@@ -73,13 +82,21 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
       Alert.alert('Check the date', 'Use the format YYYY-MM-DD, for example 2026-10-18.');
       return;
     }
-    const cleanParts = parts
+    const rows = parts
       .map((p) => ({
+        ...p,
         name: p.name.trim(),
         partNumber: p.partNumber?.trim() || undefined,
         quantity: p.quantity?.trim() || undefined,
       }))
       .filter((p) => p.name || p.partNumber);
+    const cleanParts: PartUsed[] = rows.map(({ name, partNumber, quantity }) => ({ name, partNumber, quantity }));
+    const extras: ServiceExtras = {
+      shopping: rows.filter((p) => p.toShopping).map(({ name, partNumber, quantity }) => ({ name: name || partNumber || '', partNumber, quantity })),
+      saveParts: rows
+        .filter((p) => p.saveToMachine && !isSaved(p))
+        .map((p) => ({ label: p.name || 'Part', partNumber: p.partNumber ?? '' })),
+    };
 
     const error = onSubmit({
       assetId: asset.id,
@@ -91,13 +108,19 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
       hoursAtService: Number(hoursText.replace(',', '.')),
       completedTaskIds: completed,
       notes: notes.trim() || undefined,
-    });
+    }, extras);
     if (error) {
       Alert.alert('Cannot save service', error);
       return;
     }
     Keyboard.dismiss();
-    Alert.alert('Service saved', `${title.trim()} logged for ${asset.name}.`);
+    const extraText = [
+      extras.shopping?.length ? `${extras.shopping.length} added to the shopping list.` : '',
+      extras.saveParts?.length ? `${extras.saveParts.length} saved to this machine's parts.` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    Alert.alert('Service saved', `${title.trim()} logged for ${asset.name}.${extraText ? `\n${extraText}` : ''}`);
     setTitle('');
     setTitleTouched(false);
     setDescription('');
@@ -165,7 +188,8 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
           </View>
         )}
         {parts.map((p, i) => (
-          <View key={i} style={s.partRow}>
+          <View key={i} style={s.partBlock}>
+          <View style={s.partRow}>
             <Input style={{ flex: 2 }} placeholder="Part" value={p.name} onChangeText={(v) => setPart(i, { name: v })} />
             <Input
               style={{ flex: 2 }}
@@ -189,8 +213,29 @@ export function ServiceForm({ asset, tasks, thresholds, technicians, defaultTech
               onPress={() => setParts((x) => x.filter((_, j) => j !== i))}
             />
           </View>
+          <View style={s.toggles}>
+            <Pressable
+              onPress={() => setPart(i, { toShopping: !p.toShopping })}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: !!p.toShopping }}
+              style={[s.toggle, p.toShopping && s.toggleOn]}
+            >
+              <Text style={[s.toggleText, p.toShopping && s.toggleTextOn]}>{p.toShopping ? '✓ ' : ''}Add to shopping list</Text>
+            </Pressable>
+            {(p.name.trim() || p.partNumber?.trim()) && !isSaved(p) ? (
+              <Pressable
+                onPress={() => setPart(i, { saveToMachine: !p.saveToMachine })}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: !!p.saveToMachine }}
+                style={[s.toggle, p.saveToMachine && s.toggleOn]}
+              >
+                <Text style={[s.toggleText, p.saveToMachine && s.toggleTextOn]}>{p.saveToMachine ? '✓ ' : ''}Save to machine parts</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          </View>
         ))}
-        <Button title="+ Add part" variant="secondary" onPress={() => setParts((p) => [...p, emptyPart()])} />
+        <Button title="+ Add part (saved or custom)" variant="secondary" onPress={() => setParts((p) => [...p, emptyPart()])} />
       </View>
 
       <View style={s.twoCol}>
@@ -223,6 +268,12 @@ const makeStyles = (c: Palette) =>
       justifyContent: 'center',
     },
     quickText: { color: c.accent, fontSize: 15, fontWeight: '700' },
+    partBlock: { marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: c.border },
     partRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
+    toggles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    toggle: { minHeight: 40, paddingHorizontal: spacing.md, borderRadius: 999, borderWidth: 1, borderColor: c.border, justifyContent: 'center' },
+    toggleOn: { backgroundColor: c.accent, borderColor: c.accent },
+    toggleText: { color: c.text, fontSize: 14, fontWeight: '700' },
+    toggleTextOn: { color: c.onAccent },
     twoCol: { flexDirection: 'row', gap: spacing.sm },
   });

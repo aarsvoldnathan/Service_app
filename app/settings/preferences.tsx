@@ -2,7 +2,8 @@ import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button, Card, ChipSelect, SectionTitle } from '../../src/components/ui';
+import { Button, Card, ChipSelect, Field, SectionTitle } from '../../src/components/ui';
+import { ANDROID_BUILD } from '../../src/config';
 import { useStore } from '../../src/store';
 import { ACCENTS, AccentKey, Palette, spacing, ThemeMode, useStyles } from '../../src/theme';
 
@@ -51,6 +52,43 @@ export default function PreferencesScreen() {
           <Text style={s.help}>Pre-fills “Service done by” and assignments.</Text>
         </Card>
 
+        <SectionTitle>Invoice details</SectionTitle>
+        <Card style={s.card}>
+          <Field
+            label="Business name"
+            value={prefs.business.name ?? ''}
+            onChangeText={(v) => setPrefs({ business: { ...prefs.business, name: v || undefined } })}
+          />
+          <Field
+            label="Phone"
+            keyboardType="phone-pad"
+            value={prefs.business.phone ?? ''}
+            onChangeText={(v) => setPrefs({ business: { ...prefs.business, phone: v || undefined } })}
+          />
+          <Field
+            label="Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={prefs.business.email ?? ''}
+            onChangeText={(v) => setPrefs({ business: { ...prefs.business, email: v || undefined } })}
+          />
+          <Field
+            label="Address"
+            multiline
+            value={prefs.business.address ?? ''}
+            onChangeText={(v) => setPrefs({ business: { ...prefs.business, address: v || undefined } })}
+          />
+          <Field
+            label="Next invoice number"
+            keyboardType="number-pad"
+            value={String(prefs.business.nextInvoiceNumber)}
+            onChangeText={(v) => {
+              const n = parseInt(v, 10);
+              if (Number.isFinite(n) && n > 0) setPrefs({ business: { ...prefs.business, nextInvoiceNumber: n } });
+            }}
+          />
+        </Card>
+
         <SectionTitle>Data</SectionTitle>
         <Card style={s.card}>
           <Text style={s.help}>
@@ -60,7 +98,10 @@ export default function PreferencesScreen() {
           <Button title="Load demo data" variant="danger" onPress={reset} style={{ marginTop: spacing.sm }} />
         </Card>
 
-        <Text style={s.version}>Service Ceo {Constants.expoConfig?.version ?? ''}</Text>
+        <Text style={s.version}>
+          Service Ceo {Constants.expoConfig?.version ?? ''}
+          {ANDROID_BUILD ? ` · Android build ${ANDROID_BUILD}` : ''}
+        </Text>
       </ScrollView>
     </View>
   );

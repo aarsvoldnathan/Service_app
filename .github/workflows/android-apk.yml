@@ -45,6 +45,12 @@ jobs:
 
       - run: npm install --no-audit --no-fund
 
+      - name: Stamp the build number into the app
+        # The app compares this with the newest release to show "Update available".
+        run: |
+          node -e "const f='app.json';const j=require('./'+f);j.expo.extra={...(j.expo.extra||{}),androidBuild:${{ github.run_number }}};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+          grep -n androidBuild app.json
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
 
