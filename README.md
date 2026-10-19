@@ -50,7 +50,7 @@ Service_app/
 1. In GitHub Desktop: File > Clone repository > `aarsvoldnathan/Service_app` > Clone.
 2. In VS Code: File > Open Folder > select the cloned `Service_app` folder.
 3. Open a terminal: Terminal > New Terminal.
-4. Run this once. It installs everything and matches versions to the current Expo Go app:
+4. Run this once. It installs everything at the versions the app is built with (Expo SDK 54):
    ```
    npm run setup
    ```
@@ -59,6 +59,8 @@ Service_app/
    npm start
    ```
 6. Scan the QR code. iPhone: use the Camera app. Android: use the "Scan QR code" button in Expo Go.
+
+**Android:** the Play Store's Expo Go only runs the newest Expo SDK. Install the **SDK 54** build of Expo Go from https://expo.dev/go (choose SDK 54 and Android) instead.
 
 Edit any file and save. The app on your phone updates instantly.
 
