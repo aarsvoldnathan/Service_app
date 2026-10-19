@@ -91,6 +91,18 @@ After `npm run setup`, commit the updated `package.json` and new `package-lock.j
 
 To test with employees before release, use TestFlight (iOS) and an Internal testing track (Android).
 
+## Android app from GitHub (no computer needed)
+
+`.github/workflows/android-apk.yml` builds an installable Android app (.apk) on every push and publishes it on the Releases page.
+
+On your Android phone:
+1. Open https://github.com/aarsvoldnathan/Service_app/releases/latest
+2. Tap the `ServiceCeo-android-N.apk` file to download it.
+3. Open the download. The first time, Android asks to allow installs from your browser: allow it, then tap **Install**.
+4. For updates, repeat these steps. The new version installs over the old one and keeps your data.
+
+The newest 5 Android builds are kept.
+
 ## TestFlight builds from GitHub (no Mac needed)
 
 `.github/workflows/ios-testflight.yml` builds the iPhone app on GitHub's Mac machines on every push to `main`.

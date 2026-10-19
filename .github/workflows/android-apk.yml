@@ -1,0 +1,96 @@
+name: Android app (APK)
+
+# Every push to main (or a claude/ branch) builds an Android app file (.apk)
+# and publishes it on the repository's Releases page, so it can be downloaded
+# and installed straight from an Android phone:
+#   https://github.com/aarsvoldnathan/Service_app/releases/latest
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # needed to publish the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Set version code
+        # Each build gets a higher number so the new app installs over the old one.
+        run: |
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          grep -n "versionCode" android/app/build.gradle
+
+      - name: Build the APK
+        working-directory: android
+        # arm64 covers all current Android phones and keeps the build fast and the file small.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          APK="ServiceCeo-android-${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          ls -lh "$APK"
+          TAG="android-${{ github.run_number }}"
+          SUBJECT="$(printf '%s\n' "${COMMIT_MESSAGE:-Manual build}" | head -n 1)"
+          {
+            echo "Android build ${{ github.run_number }} from \`$BRANCH\` (${SHA:0:7})."
+            echo
+            echo "**Latest change:** $SUBJECT"
+            echo
+            echo "On your Android phone: tap **$APK** below, then open it to install."
+            echo "The first time, Android asks you to allow installs from your browser."
+          } > notes.md
+          gh release create "$TAG" "$APK" \
+            --target "$SHA" \
+            --title "Android build ${{ github.run_number }}" \
+            --notes-file notes.md \
+            --latest
+
+      - name: Remove old Android releases (keep the newest 5)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("android-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+          while read -r tag; do
+            [ -n "$tag" ] && gh release delete "$tag" --yes --cleanup-tag || true
+          done
