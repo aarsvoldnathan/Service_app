@@ -129,6 +129,7 @@ export function buildSeedData(): AppData {
     assets: [
       {
         id: 'a1',
+        templateId: 'kubota-l3901',
         fleetId: 'f-work',
         name: 'Kubota L3901 Tractor',
         make: 'Kubota',
@@ -151,6 +152,7 @@ export function buildSeedData(): AppData {
       },
       {
         id: 'a3',
+        templateId: 'bobcat-t595',
         fleetId: 'f-work',
         name: 'Bobcat T595 Track Loader',
         make: 'Bobcat',
@@ -163,6 +165,7 @@ export function buildSeedData(): AppData {
       },
       {
         id: 'a2',
+        templateId: 'honda-eu7000is',
         fleetId: 'f-home',
         name: 'Honda EU7000is Generator',
         make: 'Honda',

@@ -5,6 +5,7 @@ import { ScannerModal } from '../../../src/components/ScannerModal';
 import { ScheduleEditor } from '../../../src/components/ScheduleEditor';
 import { Button, Card, ChipSelect, Field, SectionTitle } from '../../../src/components/ui';
 import { useStore } from '../../../src/store';
+import { findTemplate, TEMPLATES, templateLabel } from '../../../src/templates';
 import { Palette, spacing, useStyles } from '../../../src/theme';
 
 type ScanTarget = 'barcode' | 'serial' | null;
@@ -14,7 +15,7 @@ export default function MachineEditScreen() {
   const s = useStyles(makeStyles);
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; barcode?: string; fleetId?: string }>();
-  const { assets, fleets, activeFleet, saveAsset, deleteAsset } = useStore();
+  const { assets, fleets, activeFleet, saveAsset, deleteAsset, applyTemplate } = useStore();
   // After adding a new machine we stay on this screen and switch to editing it.
   const [createdId, setCreatedId] = useState<string | undefined>();
   const existing = assets.find((a) => a.id === (createdId ?? params.id));
@@ -30,6 +31,29 @@ export default function MachineEditScreen() {
   const [hours, setHours] = useState(String(existing?.currentHours ?? 0));
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [scan, setScan] = useState<ScanTarget>(null);
+  const [templateId, setTemplateId] = useState<string | undefined>(existing?.templateId);
+  const template = findTemplate(templateId);
+
+  const pickTemplate = (id: string) => {
+    const t = findTemplate(id);
+    setTemplateId(id);
+    if (!t) return;
+    if (!make.trim()) setMake(t.make);
+    if (!model.trim()) setModel(t.model);
+    if (!name.trim()) setName(templateLabel(t));
+  };
+
+  const loadTemplate = () => {
+    if (!existing || !template) return;
+    Alert.alert(
+      `Load ${templateLabel(template)} schedule?`,
+      'This replaces the service items on this machine with the factory schedule, counting from the current hours.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Replace schedule', style: 'destructive', onPress: () => applyTemplate(existing.id, template.id) },
+      ],
+    );
+  };
 
   const save = () => {
     const h = Number(hours.replace(',', '.'));
@@ -45,6 +69,7 @@ export default function MachineEditScreen() {
       make: make.trim() || undefined,
       model: model.trim() || undefined,
       year: year.trim() || undefined,
+      templateId: existing ? existing.templateId : templateId,
       serial,
       barcode,
       currentHours: h,
@@ -59,7 +84,12 @@ export default function MachineEditScreen() {
     if (isNew && id) {
       // Stay here so the new machine's schedule can be set up right away.
       setCreatedId(id);
-      Alert.alert('Machine added', 'Clean filters, check fluids and grease were added at every 10 hours. Add the factory schedule below.');
+      Alert.alert(
+        'Machine added',
+        template
+          ? `The ${templateLabel(template)} factory schedule was added. Review it below.`
+          : 'Clean filters, check fluids and grease were added at every 10 hours. Add the rest of the schedule below.',
+      );
     } else {
       router.back();
     }
@@ -87,8 +117,30 @@ export default function MachineEditScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
       <Stack.Screen options={{ title: isNew ? 'New machine' : 'Edit machine' }} />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <SectionTitle>Model (factory schedule)</SectionTitle>
+        <Card style={{ marginBottom: spacing.lg }}>
+          <ChipSelect
+            options={TEMPLATES.map((t) => ({ value: t.id, label: templateLabel(t) }))}
+            value={templateId}
+            onChange={pickTemplate}
+          />
+          {template ? (
+            <Text style={s.help}>
+              {template.type} · {template.items.length} service items.{' '}
+              {template.verified
+                ? 'From the manufacturer’s published service chart. Check the decal on your machine for your serial number.'
+                : 'Some intervals could not be confirmed from the manufacturer’s chart — check the decal on your machine.'}
+            </Text>
+          ) : (
+            <Text style={s.help}>Pick a model to load its factory service schedule. Leave blank for the 10-hour basics only.</Text>
+          )}
+          {!isNew && template && (
+            <Button title={`Load ${templateLabel(template)} schedule`} variant="secondary" onPress={loadTemplate} style={{ marginTop: spacing.sm }} />
+          )}
+        </Card>
+
         <Card>
-          <Field label="Machine name" placeholder="e.g. Kubota L3901 #2" value={name} onChangeText={setName} />
+          <Field label="Machine name" placeholder="e.g. Bobcat T66 #1" value={name} onChangeText={setName} />
           <View style={s.two}>
             <View style={{ flex: 1 }}>
               <Field label="Make" value={make} onChangeText={setMake} />
@@ -155,4 +207,5 @@ const makeStyles = (c: Palette) =>
     section: { marginTop: spacing.lg, marginBottom: spacing.md },
     label: { color: c.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
     two: { flexDirection: 'row', gap: spacing.sm },
+    help: { color: c.muted, fontSize: 13, marginTop: spacing.sm },
   });

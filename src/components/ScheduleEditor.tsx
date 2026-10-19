@@ -57,7 +57,7 @@ function TaskEditor({
 
   const save = () => {
     const lastHours = Number(d.lastHours.replace(',', '.'));
-    if (!Number.isFinite(lastHours) || lastHours < 0) {
+    if (!Number.isFinite(lastHours)) {
       Alert.alert('Check the hours', 'Enter the hours when this was last done.');
       return;
     }
@@ -148,7 +148,10 @@ export function ScheduleEditor({ asset, thresholds }: { asset: Asset; thresholds
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{t.name}</Text>
               <Text style={s.meta}>
-                {t.kind === 'routine' ? 'Routine' : 'Scheduled'} · {intervalText(t)} · last at {t.lastDoneHours} h
+                {t.kind === 'routine' ? 'Routine' : 'Scheduled'} · {intervalText(t)} ·{' '}
+                {t.lastDoneHours < 0 && t.intervalHours
+                  ? `first at ${t.lastDoneHours + t.intervalHours} h`
+                  : `last at ${t.lastDoneHours} h`}
               </Text>
               {t.notes ? <Text style={s.notes}>{t.notes}</Text> : null}
             </View>

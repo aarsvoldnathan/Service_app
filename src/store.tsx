@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { DEFAULT_THRESHOLDS, Thresholds } from './maintenance';
 import { buildSeedData, defaultRoutineTasks } from './seedData';
+import { findTemplate, scheduleFromTemplate, templateLabel } from './templates';
 import { ThemeProvider } from './theme';
 import {
   AppData,
@@ -47,6 +48,10 @@ type StoreValue = AppData & {
 
   saveAsset: (asset: Omit<Asset, 'id'> & { id?: string }) => { error: Result; id?: string };
   deleteAsset: (id: string) => void;
+  /** Replace a machine's schedule with a factory template. */
+  applyTemplate: (assetId: string, templateId: string) => void;
+  /** Add machines from templates: { templateId: count }. Returns how many were added. */
+  quickAdd: (fleetId: string, counts: Record<string, number>) => number;
   saveTask: (task: Omit<ServiceTask, 'id'> & { id?: string }) => Result;
   deleteTask: (id: string) => void;
 
@@ -161,6 +166,15 @@ function upgrade(raw: any): AppData {
   };
 }
 
+/** Schedule for a newly added machine: its factory template, or the default 10-hour items. */
+function startingTasks(assetId: string, currentHours: number, templateId?: string): ServiceTask[] {
+  const t = findTemplate(templateId);
+  const items = t
+    ? t.items.map((i) => scheduleFromTemplate(i, currentHours))
+    : defaultRoutineTasks(assetId, currentHours);
+  return items.map((i) => ({ ...i, assetId, id: newId() }));
+}
+
 // ---------- Provider ----------
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -266,12 +280,54 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     update((d) => ({
       ...d,
       assets: isNew ? [...d.assets, asset] : d.assets.map((a) => (a.id === id ? asset : a)),
-      // New machines start with the three 10-hour routine items.
-      tasks: isNew
-        ? [...d.tasks, ...defaultRoutineTasks(id, asset.currentHours).map((t) => ({ ...t, id: newId() }))]
-        : d.tasks,
+      // New machines start with their factory schedule, or the three 10-hour routine items.
+      tasks: isNew ? [...d.tasks, ...startingTasks(id, asset.currentHours, asset.templateId)] : d.tasks,
     }));
     return { error: null, id };
+  }, [update]);
+
+  const applyTemplate = useCallback((assetId: string, templateId: string) => {
+    update((d) => {
+      const asset = d.assets.find((a) => a.id === assetId);
+      if (!asset) return d;
+      return {
+        ...d,
+        assets: d.assets.map((a) => (a.id === assetId ? { ...a, templateId } : a)),
+        tasks: [...d.tasks.filter((t) => t.assetId !== assetId), ...startingTasks(assetId, asset.currentHours, templateId)],
+      };
+    });
+  }, [update]);
+
+  const quickAdd = useCallback((fleetId: string, counts: Record<string, number>) => {
+    const newAssets: Asset[] = [];
+    const newTasks: ServiceTask[] = [];
+    const existingNames = new Set(ref.current.assets.map((a) => a.name));
+    Object.entries(counts).forEach(([templateId, count]) => {
+      const t = findTemplate(templateId);
+      if (!t) return;
+      let n = 1;
+      for (let i = 0; i < count; i++) {
+        let name = `${templateLabel(t)} #${n}`;
+        while (existingNames.has(name)) name = `${templateLabel(t)} #${++n}`;
+        existingNames.add(name);
+        const id = newId();
+        newAssets.push({
+          id,
+          fleetId,
+          name,
+          make: t.make,
+          model: t.model,
+          templateId,
+          serial: '',
+          currentHours: 0,
+          hoursUpdatedAt: new Date().toISOString(),
+          specs: { filters: [] },
+        });
+        newTasks.push(...startingTasks(id, 0, templateId));
+      }
+    });
+    if (newAssets.length) update((d) => ({ ...d, assets: [...d.assets, ...newAssets], tasks: [...d.tasks, ...newTasks] }));
+    return newAssets.length;
   }, [update]);
 
   const deleteAsset = useCallback((id: string) => {
@@ -421,6 +477,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateSpecs,
       saveAsset,
       deleteAsset,
+      applyTemplate,
+      quickAdd,
       saveTask,
       deleteTask,
       saveFleet,
@@ -436,7 +494,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       resetDemoData,
     };
   }, [
-    data, ready, currentAssetId, updateHours, addServiceLog, updateSpecs, saveAsset, deleteAsset,
+    data, ready, currentAssetId, updateHours, addServiceLog, updateSpecs, saveAsset, deleteAsset, applyTemplate, quickAdd,
     saveTask, deleteTask, saveFleet, deleteFleet, saveTechnician, deleteTechnician, saveAssignment,
     toggleChecklistItem, setAssignmentStatus, deleteAssignment, setPrefs, resetDemoData,
   ]);

@@ -51,6 +51,8 @@ export type Asset = {
   make?: string;
   model?: string;
   year?: string;
+  /** Factory schedule template this machine was set up from. */
+  templateId?: string;
   currentHours: number;
   /** ISO timestamp of the last time hours were entered. */
   hoursUpdatedAt: string;

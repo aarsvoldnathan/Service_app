@@ -49,6 +49,12 @@ export default function MachinesScreen() {
           }
           style={{ marginTop: spacing.sm }}
         />
+        <Button
+          title="Quick add several models"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/settings/quick-add', params: { fleetId: fleetId === 'all' ? activeFleet.id : fleetId } })}
+          style={{ marginTop: spacing.sm }}
+        />
       </ScrollView>
     </View>
   );
