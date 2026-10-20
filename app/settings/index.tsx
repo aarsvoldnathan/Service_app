@@ -51,6 +51,14 @@ export default function SettingsScreen() {
         />
 
         <View style={{ height: spacing.md }} />
+        <SectionTitle>Spreadsheets</SectionTitle>
+        <ListRow
+          title="Excel spreadsheet"
+          subtitle="Import, link to OneDrive and keep in sync, download"
+          onPress={() => router.push('/settings/excel')}
+        />
+
+        <View style={{ height: spacing.md }} />
         <SectionTitle>App</SectionTitle>
         <ListRow
           title="Preferences and invoices"

@@ -33,12 +33,51 @@ type Machine = {
 };
 
 type Body = {
-  mode: 'chat' | 'setup';
+  mode: 'chat' | 'setup' | 'sheet';
   fleetId: string;
   machine: Machine;
   /** Earlier turns as plain text. */
   history?: { role: 'user' | 'assistant'; text: string }[];
   question?: string;
+  /** Spreadsheet mode. */
+  fileName?: string;
+  sheets?: { name: string; rows: string[][] }[];
+  specFields?: { id: string; label: string }[];
+  categories?: { id: string; name: string }[];
+};
+
+const COLS = (fields: string[]) => ({ type: 'object', description: 'Field -> 0-based column index. Leave out fields that have no column.', properties: Object.fromEntries(fields.map((f) => [f, { type: 'integer' }])) });
+const MAP_TOOL = {
+  name: 'map_sheet',
+  description: 'Say which sheet and columns hold the machine list and the service history.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      machines: {
+        type: 'object',
+        description: 'Table with one row per machine (unit list / fleet list). Omit if there is none.',
+        properties: {
+          sheet: { type: 'string' },
+          header_row: { type: 'integer', description: '0-based index of the header row in rows[].' },
+          columns: COLS(['name', 'make', 'model', 'year', 'serial', 'barcode', 'category', 'hours', 'notes']),
+          spec_columns: { type: 'object', description: 'Spec field id -> column index, for columns holding specs such as oil type or tire pressure.', additionalProperties: { type: 'integer' } },
+        },
+        required: ['sheet', 'header_row', 'columns'],
+      },
+      logs: {
+        type: 'object',
+        description: 'Table with one row per service/repair done (maintenance log / work history). Omit if there is none.',
+        properties: {
+          sheet: { type: 'string' },
+          header_row: { type: 'integer' },
+          columns: COLS(['date', 'machine', 'serial', 'make', 'model', 'hours', 'service', 'performedBy', 'description', 'parts', 'notes']),
+        },
+        required: ['sheet', 'header_row', 'columns'],
+      },
+      category_map: { type: 'object', description: 'Text seen in the type/category column -> category id.', additionalProperties: { type: 'string' } },
+      notes: { type: 'string', description: 'One or two plain sentences for the person: what was found, anything that could not be matched.' },
+    },
+  },
 };
 
 // The one tool Claude uses to hand back changes for the person to review.
@@ -152,6 +191,37 @@ async function callClaude(apiKey: string, payload: Record<string, unknown>) {
   return data;
 }
 
+async function mapSheet(apiKey: string, body: Body) {
+  const sheets = (body.sheets ?? []).slice(0, 12);
+  if (!sheets.length) return json({ error: 'The spreadsheet looks empty.' }, 400);
+  const system = `You read spreadsheets that equipment owners keep for their machines (skid steers, excavators, lifts, trailers, mowers...) and tell the Service Ceo app which columns hold what.
+Rows are given as JSON arrays; row and column numbers are 0-based positions in those arrays. Row 0 is the first row of the sheet.
+- "machines" = a list with one row per machine. "logs" = one row per service, repair or inspection done (they usually have a date).
+- A single sheet can be a log that also names the machine on each row; then map it as "logs" with its machine/serial/make/model columns.
+- "machine" in logs and "name" in machines = the unit name or number people use. "service" = the short title of the work; "description" = longer details if a separate column exists.
+- Only use columns that really exist. Leave fields out rather than guessing.
+- Spec field ids you may use for spec_columns: ${(body.specFields ?? []).map((f) => `${f.id} (${f.label})`).join(', ')}.
+- Category ids for category_map: ${(body.categories ?? []).map((c) => `${c.id} (${c.name})`).join(', ')}.
+Call map_sheet exactly once.`;
+  const data = await callClaude(apiKey, {
+    model: MODEL,
+    max_tokens: 3000,
+    system,
+    messages: [{ role: 'user', content: `File: ${body.fileName ?? 'spreadsheet'}\n\n${sheets.map((s) => `SHEET "${s.name}":\n${s.rows.map((r, i) => `${i}: ${JSON.stringify(r)}`).join('\n')}`).join('\n\n')}` }],
+    tools: [MAP_TOOL],
+    tool_choice: { type: 'auto' },
+    output_config: { effort: 'medium' },
+  });
+  let mapping: unknown = null;
+  let text = '';
+  for (const b of data.content ?? []) {
+    if (b.type === 'tool_use' && b.name === 'map_sheet') mapping = b.input;
+    if (b.type === 'text') text += b.text;
+  }
+  if (!mapping) return json({ error: 'The AI could not read this spreadsheet. Match the columns by hand.' }, 422);
+  return json({ mapping, text: text.trim() });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Use POST.' }, 405);
@@ -173,7 +243,7 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Bad request.' }, 400);
   }
-  if (!body?.fleetId || !body.machine) return json({ error: 'Missing machine details.' }, 400);
+  if (!body?.fleetId || (!body.machine && body.mode !== 'sheet')) return json({ error: 'Missing machine details.' }, 400);
 
   // Must be a member of the fleet (checked with the person's own permissions).
   const { data: member } = await userClient.from('fleet_members').select('role').eq('fleet_id', body.fleetId).eq('user_id', userId).maybeSingle();
@@ -184,6 +254,14 @@ Deno.serve(async (req) => {
   const { data: count } = await admin.rpc('ai_count_request', { p_user: userId });
   if (typeof count === 'number' && count > DAILY_LIMIT) {
     return json({ error: `Daily AI limit reached (${DAILY_LIMIT} requests). Try again tomorrow.` }, 429);
+  }
+
+  if (body.mode === 'sheet') {
+    try {
+      return await mapSheet(apiKey, body);
+    } catch (e) {
+      return json({ error: `The AI helper had a problem: ${(e as Error).message}` }, 502);
+    }
   }
 
   const m = body.machine;

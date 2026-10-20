@@ -32,6 +32,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
+      - name: Match Expo package versions
+        run: npx expo install --fix
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Bundle the JavaScript for iPhone
@@ -66,6 +68,8 @@ jobs:
         with:
           xcode-version: latest-stable
       - run: npm install --no-audit --no-fund
+      - name: Match Expo package versions
+        run: npx expo install --fix
       - name: Generate the Xcode project
         run: |
           npx expo prebuild --platform ios --no-install

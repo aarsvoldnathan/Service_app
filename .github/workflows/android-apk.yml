@@ -45,6 +45,9 @@ jobs:
 
       - run: npm install --no-audit --no-fund
 
+      - name: Match Expo package versions
+        run: npx expo install --fix
+
       - name: Stamp the build number into the app
         # The app compares this with the newest release to show "Update available".
         run: |

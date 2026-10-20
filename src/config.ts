@@ -11,3 +11,7 @@ export const ANDROID_BUILD: number = Number((Constants.expoConfig?.extra as { an
  *  person can see is enforced by the database's row-level security rules. */
 export const SUPABASE_URL = 'https://hzicabjeqprtiolsvxbn.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_bkRnSBIB_893PTxXdrKDLg_Ab9oRXAN';
+
+/** Microsoft app (client) ID for the live Excel/OneDrive link. Not a secret. Leave empty to enter it in
+ *  the app (Settings › Excel spreadsheet) instead. Setup steps: docs/EXCEL_SETUP.md. */
+export const MS_CLIENT_ID = '';

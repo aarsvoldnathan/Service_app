@@ -4,6 +4,7 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth';
 import { CloudProvider } from '../src/cloud';
+import { ExcelProvider } from '../src/sheets/ExcelLink';
 import { AuthScreen } from '../src/screens/AuthScreen';
 import { Onboarding } from '../src/screens/Onboarding';
 import { StoreProvider, userStorageKey, useStore } from '../src/store';
@@ -63,7 +64,9 @@ function Gate() {
   return (
     <StoreProvider key={userId} storageKey={userStorageKey(userId)}>
       <CloudProvider>
-        <ThemedStack />
+        <ExcelProvider>
+          <ThemedStack />
+        </ExcelProvider>
       </CloudProvider>
     </StoreProvider>
   );

@@ -94,3 +94,34 @@ export async function askAssistant(body: {
   }
   return data as AiAnswer;
 }
+
+/** Ask the AI which sheets and columns hold machines and service history. Returns the raw mapping. */
+export async function askSheetMapping(body: {
+  fleetId: string;
+  fileName: string;
+  sheets: { name: string; rows: string[][] }[];
+  specFields: { id: string; label: string }[];
+  categories: { id: string; name: string }[];
+}): Promise<{ mapping: unknown; text?: string }> {
+  // Only the top of each sheet is sent: enough to read the headers and a few example rows.
+  const sheets = body.sheets.slice(0, 12).map((s) => ({
+    name: s.name,
+    rows: s.rows.slice(0, 16).map((r) => r.slice(0, 40).map((v) => String(v ?? '').slice(0, 60))),
+  }));
+  const { data, error } = await supabase.functions.invoke('assistant', { body: { mode: 'sheet', ...body, sheets } });
+  if (error) {
+    let msg = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === 'function') {
+        const j = await ctx.json();
+        if (j?.error === 'not_configured') msg = 'not_configured';
+        else if (j?.error) msg = j.error;
+      }
+    } catch {
+      // keep the original message
+    }
+    throw new Error(msg);
+  }
+  return data as { mapping: unknown; text?: string };
+}
