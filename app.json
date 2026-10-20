@@ -5,15 +5,56 @@
     "scheme": "serviceceo",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#0E1013",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.aarsvold.serviceceo"
+      "bundleIdentifier": "com.aarsvold.serviceceo",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.aarsvold.serviceceo"
     },
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Service Ceo uses the camera to scan machine barcodes and QR codes.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Service Ceo uses your photos to attach receipt pictures to expenses.",
+          "cameraPermission": "Service Ceo uses the camera to scan machine barcodes and photograph receipts."
+        }
+      ],
+      "expo-quick-actions",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "QuickHours",
+              "label": "Service Ceo \u2013 Quick hours",
+              "description": "Scan a machine and update its hours",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/icon.png"
+            }
+          ]
+        }
+      ],
+      "@bacons/apple-targets"
+    ]
   }
 }

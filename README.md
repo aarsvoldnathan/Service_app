@@ -50,7 +50,7 @@ Service_app/
 1. In GitHub Desktop: File > Clone repository > `aarsvoldnathan/Service_app` > Clone.
 2. In VS Code: File > Open Folder > select the cloned `Service_app` folder.
 3. Open a terminal: Terminal > New Terminal.
-4. Run this once. It installs everything and matches versions to the current Expo Go app:
+4. Run this once. It installs everything at the versions the app is built with (Expo SDK 54):
    ```
    npm run setup
    ```
@@ -59,6 +59,8 @@ Service_app/
    npm start
    ```
 6. Scan the QR code. iPhone: use the Camera app. Android: use the "Scan QR code" button in Expo Go.
+
+**Android:** the Play Store's Expo Go only runs the newest Expo SDK. Install the **SDK 54** build of Expo Go from https://expo.dev/go (choose SDK 54 and Android) instead.
 
 Edit any file and save. The app on your phone updates instantly.
 
@@ -88,6 +90,28 @@ After `npm run setup`, commit the updated `package.json` and new `package-lock.j
 5. Before the first public release: add an app icon and splash image (`assets/` folder, referenced in `app.json`) and complete each store's listing and privacy form.
 
 To test with employees before release, use TestFlight (iOS) and an Internal testing track (Android).
+
+## Android app from GitHub (no computer needed)
+
+`.github/workflows/android-apk.yml` builds an installable Android app (.apk) on every push and publishes it on the Releases page.
+
+On your Android phone:
+1. Open https://github.com/aarsvoldnathan/Service_app/releases/latest
+2. Tap the `ServiceCeo-android-N.apk` file to download it.
+3. Open the download. The first time, Android asks to allow installs from your browser: allow it, then tap **Install**.
+4. For updates, repeat these steps. The new version installs over the old one and keeps your data.
+
+The newest 5 Android builds are kept.
+
+## TestFlight builds from GitHub (no Mac needed)
+
+`.github/workflows/ios-testflight.yml` builds the iPhone app on GitHub's Mac machines on every push to `main`.
+
+- To send a build to TestFlight, put `[upload]` in the first line of the commit message, or run the workflow from the Actions tab with "Upload to TestFlight" ticked.
+- It needs four repository secrets (Settings > Secrets and variables > Actions): `APPLE_TEAM_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY` (full text of the .p8 key file).
+- The upload registers the bundle ID `com.aarsvold.serviceceo` automatically. The app record must exist in App Store Connect (My Apps > + > New App, same bundle ID) before the first upload.
+- The app icon is `assets/icon.png`.
+- After an upload, the build shows up in App Store Connect > TestFlight once Apple finishes processing it, usually within 15 minutes.
 
 ## Roadmap
 

@@ -1,90 +1,72 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { daysSince } from '../maintenance';
-import { colors, radius, spacing, touch } from '../theme';
+import { Palette, radius, spacing, useStyles } from '../theme';
 import { Asset } from '../types';
+import { Button, Input } from './ui';
 
 type Props = {
   asset: Asset;
   now: Date;
   onSave: (assetId: string, hours: number) => string | null;
+  /** Show the machine name (dashboard) or hide it (service screen, where it is already shown). */
+  showName?: boolean;
 };
 
-export function HoursRow({ asset, now, onSave }: Props) {
+export function HoursRow({ asset, now, onSave, showName = true }: Props) {
+  const s = useStyles(makeStyles);
   const [text, setText] = useState('');
   const age = daysSince(asset.hoursUpdatedAt, now);
 
   const save = () => {
     const hours = Number(text.replace(',', '.'));
     const error = onSave(asset.id, hours);
-    if (error) {
-      Alert.alert('Cannot save hours', error);
-    } else {
-      setText('');
-    }
+    if (error) Alert.alert('Cannot save hours', error);
+    else setText('');
   };
 
   return (
-    <View style={styles.row}>
-      <Text style={styles.name}>{asset.name}</Text>
-      <Text style={styles.meta}>
-        Last reading: {asset.currentHours} h · updated {age} day{age === 1 ? '' : 's'} ago
+    <View style={s.row}>
+      {showName ? <Text style={s.name}>{asset.name}</Text> : null}
+      <Text style={s.meta}>
+        Current: <Text style={s.hours}>{asset.currentHours} h</Text> · updated{' '}
+        {age <= 0 ? 'today' : `${age} day${age === 1 ? '' : 's'} ago`}
       </Text>
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
+      <View style={s.inputRow}>
+        <Input
+          style={{ flex: 1, fontSize: 18 }}
           value={text}
           onChangeText={setText}
-          placeholder="New hours"
-          placeholderTextColor={colors.muted}
+          placeholder="New hours reading"
           keyboardType="decimal-pad"
           returnKeyType="done"
           onSubmitEditing={save}
+          accessibilityLabel={`New hours for ${asset.name}`}
         />
-        <Pressable
-          style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}
+        <Button
+          title="Update"
           onPress={save}
           disabled={text.trim() === ''}
-          accessibilityRole="button"
+          style={{ minWidth: 100 }}
           accessibilityLabel={`Save hours for ${asset.name}`}
-        >
-          <Text style={styles.buttonText}>Save</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  name: { color: colors.text, fontSize: 17, fontWeight: '700' },
-  meta: { color: colors.muted, fontSize: 14, marginTop: 2, marginBottom: spacing.sm },
-  inputRow: { flexDirection: 'row', gap: spacing.sm },
-  input: {
-    flex: 1,
-    height: touch,
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    fontSize: 18,
-  },
-  button: {
-    height: touch,
-    minWidth: 88,
-    backgroundColor: colors.accent,
-    borderRadius: radius,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: { color: '#1A1200', fontSize: 17, fontWeight: '800' },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    row: {
+      backgroundColor: c.card,
+      borderColor: c.border,
+      borderWidth: 1,
+      borderRadius: radius,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    name: { color: c.text, fontSize: 17, fontWeight: '700' },
+    meta: { color: c.muted, fontSize: 14, marginTop: 2, marginBottom: spacing.sm },
+    hours: { color: c.text, fontWeight: '800' },
+    inputRow: { flexDirection: 'row', gap: spacing.sm },
+  });

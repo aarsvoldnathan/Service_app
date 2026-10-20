@@ -1,34 +1,44 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { font, Palette, radius, spacing, useStyles } from '../theme';
 
-type Props = { label: string; value: number; color: string };
+type Props = { label: string; value: number; color: string; onPress?: () => void };
 
-export function Tile({ label, value, color }: Props) {
+export function Tile({ label, value, color, onPress }: Props) {
+  const s = useStyles(makeStyles);
   return (
-    <View style={styles.tile}>
-      <Text style={[styles.value, { color }]}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${value} ${label}`}
+      style={({ pressed }) => [s.tile, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[s.value, { color }]}>{value}</Text>
+      <Text style={s.label}>{label}</Text>
+    </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  tile: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  value: { fontSize: 32, fontWeight: '800' },
-  label: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    tile: {
+      flex: 1,
+      backgroundColor: c.card,
+      borderColor: c.border,
+      borderWidth: 1,
+      borderRadius: radius,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+    },
+    value: { fontSize: 34, fontFamily: font.headingBold },
+    label: {
+      color: c.muted,
+      fontSize: 11,
+      fontFamily: font.regular,
+      marginTop: spacing.xs,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      textAlign: 'center',
+    },
+  });
