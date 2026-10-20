@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Card, ChipSelect, Field, SectionTitle } from '../../src/components/ui';
+import { Card, Field, SectionTitle } from '../../src/components/ui';
 import { money, parseMoney } from '../../src/dates';
 import { taxPercent } from '../../src/finance';
 import { useStore } from '../../src/store';
@@ -69,27 +69,21 @@ export default function InvoiceSettings() {
           <Field label="Next invoice number" keyboardType="number-pad" value={nextNo} onChangeText={setNextNo} onEndEditing={saveNextNo} onSubmitEditing={saveNextNo} />
         </Card>
 
-        <SectionTitle>Billing presets</SectionTitle>
+        <SectionTitle>Rate</SectionTitle>
         <Card style={s.card}>
           <Field label="My hourly rate ($)" placeholder="e.g. 35" keyboardType="decimal-pad" value={rate} onChangeText={setRate} onEndEditing={saveRate} onSubmitEditing={saveRate} />
-          <Field label="Bill to (default customer)" placeholder="Company name" value={hours.billTo ?? ''} onChangeText={(v) => setHours({ billTo: v || undefined })} />
-          <Text style={s.label}>Unpaid lunch taken off each day</Text>
-          <ChipSelect
-            options={[
-              { value: '0', label: 'None' },
-              { value: '0.5', label: '30 min' },
-              { value: '1', label: '1 hour' },
-            ]}
-            value={String(hours.lunch ?? 0)}
-            onChange={(v) => setHours({ lunch: Number(v) })}
-          />
         </Card>
 
-        <SectionTitle>Weekly hours text</SectionTitle>
+        <SectionTitle>Send to</SectionTitle>
         <Card style={s.card}>
-          <Field label="Boss name" placeholder="e.g. Mike" value={hours.bossName ?? ''} onChangeText={(v) => setHours({ bossName: v || undefined })} />
-          <Field label="Boss phone" placeholder="e.g. 612 555 0134" keyboardType="phone-pad" value={hours.bossPhone ?? ''} onChangeText={(v) => setHours({ bossPhone: v || undefined })} />
-          <Text style={s.help}>"Text hours" on the Hours page opens a message to this number: mon 8-6, tues 8-6 … total 60 hours.</Text>
+          <Field
+            label="Invoice to:"
+            placeholder="Company or person"
+            value={hours.billTo ?? hours.bossName ?? ''}
+            onChangeText={(v) => setHours({ billTo: v || undefined, bossName: undefined })}
+          />
+          <Field label="Phone:" placeholder="e.g. 612 555 0134" keyboardType="phone-pad" value={hours.bossPhone ?? ''} onChangeText={(v) => setHours({ bossPhone: v || undefined })} />
+          <Text style={s.help}>Send invoice on the Hours page can text the invoice to this number.</Text>
         </Card>
         <View style={{ height: spacing.lg }} />
       </ScrollView>

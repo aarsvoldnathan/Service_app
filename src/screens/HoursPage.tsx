@@ -5,7 +5,7 @@ import { ExpenseSheet } from '../components/ExpenseSheet';
 import { Button, Card, Field, Muted, SectionTitle } from '../components/ui';
 import { money, parseMoney, shortDate } from '../dates';
 import { jobTotals, taxPercent } from '../finance';
-import { DAY_SHORT, dayIso, fmtHours, md, parseSpan, sameDay, weekDays, weekStart, weekText } from '../hours';
+import { DAY_SHORT, DAY_TEXT, dayIso, fmtHours, md, parseSpan, sameDay, weekDays, weekStart } from '../hours';
 import { shareInvoicePdf, shareInvoiceText } from '../invoice';
 import { useStore } from '../store';
 import { font, Palette, radius, spacing, useStyles, useTheme } from '../theme';
@@ -116,8 +116,8 @@ export function HoursPage() {
   });
   const weekTotal = week.reduce((a, d) => a + d.hours, 0);
 
-  const sendText = async () => {
-    const body = weekText(week);
+  /** Open a text to the "Phone" preset (or the share sheet when there's no number). */
+  const textMessage = async (body: string) => {
     const phone = setup.bossPhone?.replace(/[^\d+]/g, '');
     if (phone) {
       const url = `sms:${phone}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(body)}`;
@@ -128,7 +128,25 @@ export function HoursPage() {
         // fall back to the share sheet
       }
     }
-    Share.share({ message: body });
+    await Share.share({ message: body });
+  };
+
+  /** +Lunch: unpaid break taken off each day; days on the running invoice are recalculated. */
+  const pickLunch = () => {
+    const set = (v: number) => {
+      setPrefs({ hours: { ...setup, lunch: v } });
+      timeEntries
+        .filter((e) => running && e.jobId === running.id && e.span)
+        .forEach((e) => {
+          const sp = parseSpan(e.span!, v);
+          if (sp && sp.hours !== e.hours) saveTimeEntry({ ...e, hours: sp.hours });
+        });
+    };
+    Alert.alert('Lunch break', 'Unpaid time taken off each day you work.', [
+      { text: 'None', onPress: () => set(0) },
+      { text: '30 min', onPress: () => set(0.5) },
+      { text: '1 hour', onPress: () => set(1) },
+    ]);
   };
 
   const inv = running ? jobTotals(running, timeEntries, expenses) : { hours: 0, labor: 0, expenses: 0, total: 0 };
@@ -136,14 +154,10 @@ export function HoursPage() {
   const invExpenses = running ? expenses.filter((e) => e.jobId === running.id).sort((a, b) => b.date.localeCompare(a.date)) : [];
   const since = invEntries.map((e) => e.date).sort()[0];
 
-  const sendInvoice = (format: 'pdf' | 'text') => {
+  const sendInvoice = () => {
     if (!running || (!inv.hours && !inv.expenses)) return Alert.alert('Nothing to invoice yet', 'Enter some hours first.');
-    Alert.alert(`Send invoice for ${money(inv.total)}?`, `${fmtHours(inv.hours)} h${inv.expenses ? ` + ${money(inv.expenses)} expenses` : ''}. Hours after this start a new invoice. Mark it paid when the check comes.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Send',
-        onPress: async () => {
-          const number = store.markInvoiced(running.id);
+    const go = async (format: 'pdf' | 'text') => {
+      const number = store.markInvoiced(running.id);
           const input = {
             job: { ...running, invoiceNumber: number },
             number,
@@ -154,12 +168,30 @@ export function HoursPage() {
           };
           try {
             if (format === 'pdf') await shareInvoicePdf(input);
-            else await shareInvoiceText(input);
+            else {
+              // Same style as the weekly text: "mon 8-6, tues 8-6, ... total 60 hours".
+              const days = invEntries
+                .slice()
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map((e) => `${DAY_TEXT[(new Date(e.date).getDay() + 6) % 7]} ${e.span ?? fmtHours(e.hours)}`);
+              const body = [
+                `Invoice #${number}${prefs.business.name ? ` from ${prefs.business.name}` : ''}`,
+                [...days, `total ${fmtHours(inv.hours)} hours`].join(', '),
+                inv.expenses ? `expenses ${money(inv.expenses)}` : '',
+                `total due ${money(inv.total)}`,
+              ]
+                .filter(Boolean)
+                .join('\n');
+              await textMessage(body);
+            }
           } catch (e) {
             Alert.alert('Invoice', String((e as Error).message ?? e));
           }
-        },
-      },
+    };
+    Alert.alert(`Send invoice for ${money(inv.total)}?`, `${fmtHours(inv.hours)} h${inv.expenses ? ` + ${money(inv.expenses)} expenses` : ''}. Hours after this start a new invoice. Mark it paid when the check comes.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'PDF invoice', onPress: () => go('pdf') },
+      { text: setup.bossPhone ? 'Text it' : 'Send as text', onPress: () => go('text') },
     ]);
   };
 
@@ -215,12 +247,14 @@ export function HoursPage() {
         })}
         <View style={[s.day, s.divider]}>
           <Text style={[s.dayName, { flex: 1 }]}>TOTAL</Text>
+          <Pressable onPress={pickLunch} style={[s.lunch, lunch ? s.lunchOn : null]} accessibilityRole="button" accessibilityLabel="Lunch break">
+            <Text style={[s.lunchText, lunch ? { color: c.onAccent } : null]}>{lunch ? `Lunch ${lunch === 1 ? '1 h' : '30 min'}` : '+Lunch'}</Text>
+          </Pressable>
           <Text style={s.total}>{fmtHours(weekTotal)} h</Text>
         </View>
       </View>
-      <Text style={s.hint}>Type times like 8-6 or 7:30-5{lunch ? ` (${fmtHours(lunch)} h lunch taken off each day)` : ''}. Locked days are already invoiced.</Text>
+      <Text style={s.hint}>Type times like 8-6 or 7:30-5{lunch ? `. ${lunch === 1 ? '1 hour' : '30 min'} lunch is taken off each day` : ''}. Locked days are already invoiced.</Text>
 
-      <Button title={`💬  Text hours${setup.bossName ? ` to ${setup.bossName}` : ''}`} onPress={sendText} style={{ marginTop: spacing.md, minHeight: 56 }} />
 
       {/* Running invoice */}
       <View style={{ marginTop: spacing.lg }}>
@@ -292,11 +326,8 @@ export function HoursPage() {
             </View>
           ) : (
             <>
-              <Button title="Send invoice" onPress={() => sendInvoice('pdf')} style={{ marginTop: spacing.sm }} />
+              <Button title="Send invoice" onPress={sendInvoice} style={{ marginTop: spacing.sm, minHeight: 56 }} />
               <Button title="Got the check" variant="secondary" onPress={() => (running && (inv.hours || inv.expenses) ? setPaying(true) : Alert.alert('Nothing to close yet', 'Enter some hours first.'))} style={{ marginTop: spacing.sm }} />
-              <Pressable onPress={() => sendInvoice('text')} hitSlop={8} style={{ alignSelf: 'center', marginTop: spacing.sm }}>
-                <Text style={s.link}>Send invoice as a text instead</Text>
-              </Pressable>
             </>
           )}
         </Card>
@@ -316,7 +347,7 @@ export function HoursPage() {
 
       <Pressable onPress={() => router.push('/settings/invoicing')} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
         <Text style={s.hint}>
-          {[setup.bossName ? `Texts go to ${setup.bossName}` : 'Boss phone not set', `${money(rateNum)}/h`, setup.billTo && `bill to ${setup.billTo}`, lunch ? `${fmtHours(lunch)} h lunch` : '']
+          {[`Invoice to: ${setup.billTo || setup.bossName || 'not set'}`, setup.bossPhone ? `phone ${setup.bossPhone}` : '', `${money(rateNum)}/h`]
             .filter(Boolean)
             .join(' · ')}
           {'  '}
@@ -363,6 +394,9 @@ const makeStyles = (c: Palette) =>
     expAmount: { color: c.text, fontSize: 15, fontFamily: font.medium },
     addExp: { paddingVertical: spacing.sm },
     link: { color: c.accent, fontSize: 14, fontFamily: font.medium },
+    lunch: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: c.accent },
+    lunchOn: { backgroundColor: c.accent },
+    lunchText: { color: c.accent, fontSize: 14, fontFamily: font.heading, letterSpacing: 0.5 },
     tax: { color: c.warn, fontSize: 14, fontFamily: font.medium, marginTop: 4 },
     waiting: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingHorizontal: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderColor: c.warn, borderRadius: radius },
   });
