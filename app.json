@@ -34,7 +34,8 @@
           "photosPermission": "Service Ceo uses your photos to attach receipt pictures to expenses.",
           "cameraPermission": "Service Ceo uses the camera to scan machine barcodes and photograph receipts."
         }
-      ]
+      ],
+      "expo-quick-actions"
     ]
   }
 }

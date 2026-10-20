@@ -2,9 +2,11 @@ import { Inter_300Light, Inter_400Regular, Inter_500Medium } from '@expo-google-
 import { Oswald_500Medium, Oswald_600SemiBold, Oswald_700Bold } from '@expo-google-fonts/oswald';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as QuickActions from 'expo-quick-actions';
+import { RouterAction, useQuickActionRouting } from 'expo-quick-actions/router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth';
 import { CloudProvider } from '../src/cloud';
 import { ExcelProvider } from '../src/sheets/ExcelLink';
@@ -24,6 +26,21 @@ function Loading() {
 
 function ThemedStack() {
   const { c, isDark } = useTheme();
+  // Long-press the app icon: "Scan & update hours" (Android: drag it onto the home screen).
+  useQuickActionRouting();
+  useEffect(() => {
+    Promise.resolve(
+      QuickActions.setItems<RouterAction>([
+      {
+        id: 'quick-hours',
+        title: 'Scan & update hours',
+        subtitle: 'Quick hours',
+        icon: Platform.OS === 'ios' ? 'symbol:barcode.viewfinder' : undefined,
+        params: { href: '/quick?scan=1' },
+      },
+      ]),
+    ).catch(() => {});
+  }, []);
   const { ready, fleets } = useStore();
   if (!ready) return <Loading />;
   if (!fleets.length) {

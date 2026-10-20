@@ -54,7 +54,7 @@ export function HomePage({ onShowStatus }: { onShowStatus: () => void }) {
           onPress={() => router.push('/shopping')}
         />
         <Button title={`Invoices (${jobs.filter((j) => j.status === 'invoiced').length})`} variant="secondary" style={s.gridItem} onPress={() => router.push('/jobs')} />
-        <Button title="Fleet status" variant="secondary" style={s.gridItem} onPress={onShowStatus} />
+        <Button title="Quick hours" variant="secondary" style={s.gridItem} onPress={() => router.push('/quick')} />
       </View>
 
       {mine.length + others.length > 0 && (
