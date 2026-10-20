@@ -142,6 +142,17 @@ export type Preferences = {
   meTechnicianId?: string;
   activeFleetId: string;
   business: BusinessInfo;
+  /** Hours page: who the weekly hours text goes to, and defaults for the running invoice. */
+  hours?: HoursSetup;
+};
+
+export type HoursSetup = {
+  bossName?: string;
+  bossPhone?: string;
+  /** Unpaid lunch taken off each day, in hours. */
+  lunch?: number;
+  rate?: number;
+  billTo?: string;
 };
 
 /** Shown on invoices. */
@@ -188,6 +199,8 @@ export type Job = {
   notes?: string;
   /** Set while the time clock is running on this job (ISO time it started). */
   clockStartedAt?: string;
+  /** The person's running weekly-hours invoice (Hours page). */
+  weekly?: boolean;
 };
 
 export type TimeEntry = {
@@ -198,6 +211,8 @@ export type TimeEntry = {
   date: string;
   hours: number;
   note?: string;
+  /** Times as typed on the Hours page, e.g. "8-6". */
+  span?: string;
 };
 
 export type Expense = {

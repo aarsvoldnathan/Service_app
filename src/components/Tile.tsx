@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Palette, radius, spacing, useStyles } from '../theme';
+import { font, Palette, radius, spacing, useStyles } from '../theme';
 
 type Props = { label: string; value: number; color: string; onPress?: () => void };
 
@@ -31,10 +31,11 @@ const makeStyles = (c: Palette) =>
       paddingVertical: spacing.md,
       alignItems: 'center',
     },
-    value: { fontSize: 32, fontWeight: '800' },
+    value: { fontSize: 34, fontFamily: font.headingBold },
     label: {
       color: c.muted,
-      fontSize: 12,
+      fontSize: 11,
+      fontFamily: font.regular,
       marginTop: spacing.xs,
       textTransform: 'uppercase',
       letterSpacing: 0.8,

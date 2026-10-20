@@ -90,3 +90,14 @@ export function useStyles<T>(factory: (c: Palette) => T): T {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => factory(c), [c]);
 }
+
+/** Fonts: Oswald (condensed, rugged) for main labels; Inter light/regular for everything else.
+ *  Loaded in app/_layout.tsx. With a custom font family, leave fontWeight unset. */
+export const font = {
+  heading: 'Oswald_600SemiBold',
+  headingBold: 'Oswald_700Bold',
+  headingMedium: 'Oswald_500Medium',
+  light: 'Inter_300Light',
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+} as const;

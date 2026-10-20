@@ -10,7 +10,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import type { Level } from '../maintenance';
-import { Palette, radius, spacing, touch, useStyles, useTheme } from '../theme';
+import { font, Palette, radius, spacing, touch, useStyles, useTheme } from '../theme';
 
 export function levelColor(c: Palette, level: Level): string {
   return level === 'red' ? c.danger : level === 'orange' ? c.orange : level === 'yellow' ? c.warn : c.ok;
@@ -228,9 +228,9 @@ const makeStyles = (c: Palette) =>
     },
     sectionTitle: {
       color: c.muted,
-      fontSize: 13,
-      fontWeight: '800',
-      letterSpacing: 1,
+      fontSize: 15,
+      fontFamily: font.heading,
+      letterSpacing: 1.4,
       textTransform: 'uppercase',
     },
     card: {
@@ -241,8 +241,8 @@ const makeStyles = (c: Palette) =>
       padding: spacing.md,
     },
     field: { marginBottom: spacing.md },
-    label: { color: c.muted, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs },
-    hint: { color: c.muted, fontSize: 12, marginTop: spacing.xs },
+    label: { color: c.muted, fontSize: 14, fontFamily: font.regular, marginBottom: spacing.xs },
+    hint: { color: c.muted, fontSize: 12, fontFamily: font.light, marginTop: spacing.xs },
     input: {
       minHeight: touch,
       backgroundColor: c.bg,
@@ -253,6 +253,7 @@ const makeStyles = (c: Palette) =>
       paddingVertical: spacing.sm,
       color: c.text,
       fontSize: 17,
+      fontFamily: font.regular,
     },
     compact: { paddingHorizontal: spacing.sm, fontSize: 16 },
     multiline: { minHeight: 96 },
@@ -266,12 +267,12 @@ const makeStyles = (c: Palette) =>
     primary: { backgroundColor: c.accent },
     secondary: { borderWidth: 1, borderColor: c.border, backgroundColor: c.card },
     dangerButton: { borderWidth: 1, borderColor: c.danger },
-    buttonText: { fontSize: 17, fontWeight: '800' },
+    buttonText: { fontSize: 18, fontFamily: font.heading, letterSpacing: 1, textTransform: 'uppercase' },
     primaryText: { color: c.onAccent },
     secondaryText: { color: c.text },
     dangerText: { color: c.danger },
     headerButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-    headerButtonText: { color: c.accent, fontSize: 17, fontWeight: '700' },
+    headerButtonText: { color: c.accent, fontSize: 17, fontFamily: font.heading, letterSpacing: 0.5 },
     checkRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -290,9 +291,9 @@ const makeStyles = (c: Palette) =>
     },
     boxChecked: { backgroundColor: c.accent, borderColor: c.accent },
     tick: { color: c.onAccent, fontSize: 18, fontWeight: '900' },
-    checkTitle: { color: c.text, fontSize: 16, fontWeight: '700' },
+    checkTitle: { color: c.text, fontSize: 16, fontFamily: font.medium },
     checkDone: { textDecorationLine: 'line-through', color: c.muted },
-    checkDetail: { color: c.muted, fontSize: 14, marginTop: 2 },
+    checkDetail: { color: c.muted, fontSize: 14, fontFamily: font.light, marginTop: 2 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     chip: {
       minHeight: 44,
@@ -304,7 +305,7 @@ const makeStyles = (c: Palette) =>
       justifyContent: 'center',
     },
     chipOn: { backgroundColor: c.accent, borderColor: c.accent },
-    chipText: { color: c.text, fontSize: 15, fontWeight: '700' },
+    chipText: { color: c.text, fontSize: 15, fontFamily: font.medium },
     chipTextOn: { color: c.onAccent },
     listRow: {
       flexDirection: 'row',
@@ -320,9 +321,9 @@ const makeStyles = (c: Palette) =>
       marginBottom: spacing.sm,
     },
     dot: { width: 16, height: 16, borderRadius: 8 },
-    listTitle: { color: c.text, fontSize: 17, fontWeight: '700' },
-    listSub: { color: c.muted, fontSize: 14, marginTop: 2 },
-    listRight: { color: c.muted, fontSize: 14, fontWeight: '600' },
+    listTitle: { color: c.text, fontSize: 19, fontFamily: font.heading, letterSpacing: 0.3 },
+    listSub: { color: c.muted, fontSize: 14, fontFamily: font.light, marginTop: 2 },
+    listRight: { color: c.muted, fontSize: 14, fontFamily: font.regular },
     chevron: { color: c.muted, fontSize: 26, marginTop: -2 },
-    muted: { color: c.muted, fontSize: 15, paddingVertical: spacing.sm },
+    muted: { color: c.muted, fontSize: 15, fontFamily: font.light, paddingVertical: spacing.sm },
   });

@@ -4,11 +4,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ChipSelect, levelColor, Muted } from '../src/components/ui';
 import { Level, LEVEL_LABEL, LEVEL_RANK, machineStatus } from '../src/maintenance';
 import { useStore } from '../src/store';
-import { Palette, radius, spacing, useStyles, useTheme } from '../src/theme';
+import { font, Palette, radius, spacing, useStyles, useTheme } from '../src/theme';
 
 type Filter = 'all' | 'needs';
 
-export default function StatusScreen() {
+export default function StatusScreen({ embedded }: { embedded?: boolean } = {}) {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function StatusScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Stack.Screen options={{ title: `${activeFleet.name} status` }} />
+      {embedded ? null : <Stack.Screen options={{ title: `${activeFleet.name} status` }} />}
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.legend}>
           {counts.map(({ level, n }) => (
@@ -98,7 +98,7 @@ export default function StatusScreen() {
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
-    content: { padding: spacing.md, paddingBottom: spacing.lg * 3 },
+    content: { padding: spacing.md, paddingBottom: spacing.lg * 5 },
     legend: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
     legendItem: {
       flex: 1,
@@ -113,8 +113,8 @@ const makeStyles = (c: Palette) =>
       paddingVertical: spacing.sm,
     },
     legendDot: { width: 14, height: 14, borderRadius: 7 },
-    legendN: { color: c.text, fontSize: 22, fontWeight: '800' },
-    key: { color: c.muted, fontSize: 12, marginBottom: spacing.md },
+    legendN: { color: c.text, fontSize: 24, fontFamily: font.headingBold },
+    key: { color: c.muted, fontSize: 12, fontFamily: font.light, marginBottom: spacing.md },
     row: {
       backgroundColor: c.card,
       borderColor: c.border,
@@ -126,10 +126,10 @@ const makeStyles = (c: Palette) =>
     },
     rowHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     badge: { width: 14, height: 14, borderRadius: 7 },
-    name: { color: c.text, fontSize: 18, fontWeight: '800', flex: 1 },
-    hours: { color: c.muted, fontSize: 15, fontWeight: '700' },
-    level: { fontSize: 14, fontWeight: '800', marginTop: 4, marginBottom: 4 },
-    need: { color: c.text, fontSize: 14, marginTop: 2 },
+    name: { color: c.text, fontSize: 20, fontFamily: font.heading, flex: 1 },
+    hours: { color: c.muted, fontSize: 15, fontFamily: font.regular },
+    level: { fontSize: 14, fontFamily: font.headingMedium, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4, marginBottom: 4 },
+    need: { color: c.text, fontSize: 14, fontFamily: font.light, marginTop: 2 },
     more: { color: c.muted, fontSize: 13, marginTop: 2 },
     assigned: { color: c.accent, fontSize: 14, fontWeight: '700', marginTop: spacing.sm },
   });

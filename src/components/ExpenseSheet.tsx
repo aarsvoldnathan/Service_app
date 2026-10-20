@@ -10,7 +10,20 @@ import { Button } from './ui';
 const QUICK = ['Fuel', 'Parts', 'Oil & fluids', 'Filters', 'Hose / fittings', 'Supplies'];
 
 /** Bottom sheet to add or edit one expense: amount, what for, optional receipt photo. */
-export function ExpenseSheet({ job, expense, visible, onClose }: { job: Job; expense?: Expense; visible: boolean; onClose: () => void }) {
+export function ExpenseSheet({
+  job,
+  expense,
+  visible,
+  onClose,
+  onBeforeSave,
+}: {
+  job: Job;
+  expense?: Expense;
+  visible: boolean;
+  onClose: () => void;
+  /** Returns the job to save into (e.g. creates the running invoice the first time). */
+  onBeforeSave?: () => Job;
+}) {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const store = useStore();
@@ -30,10 +43,11 @@ export function ExpenseSheet({ job, expense, visible, onClose }: { job: Job; exp
   const save = () => {
     const d = parseDate(date);
     if (!d) return Alert.alert('Check the date', 'Use YYYY-MM-DD, for example 2026-10-19.');
+    const target = expense ? job : onBeforeSave?.() ?? job;
     const error = store.saveExpense({
       id: expense?.id,
-      jobId: job.id,
-      technicianId: job.technicianId,
+      jobId: expense?.jobId ?? target.id,
+      technicianId: target.technicianId,
       date: d,
       amount: parseMoney(amount || '0'),
       description: desc,

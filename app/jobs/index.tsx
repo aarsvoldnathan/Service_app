@@ -1,27 +1,26 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from '../../src/components/BarChart';
 import { Button, Card, ChipSelect, Field, ListRow, Muted, SectionTitle } from '../../src/components/ui';
 import { money, parseMoney, shortDate } from '../../src/dates';
-import { useNow } from '../../src/components/Social';
-import { buckets, clockText, jobTotals, liveTotals, Period, PERIOD_LABEL } from '../../src/finance';
-import { sendInvoice } from '../../src/invoiceFlow';
+import { buckets, jobTotals, Period, PERIOD_LABEL } from '../../src/finance';
 import { useCloud } from '../../src/cloud';
 import { useStore } from '../../src/store';
 import { Palette, radius, spacing, useStyles, useTheme } from '../../src/theme';
+import { Job } from '../../src/types';
 
 type Tab = 'jobs' | 'earnings';
 const ALL = '__all';
 const NONE = '__none';
 
+const STATUS_LABEL: Record<Job['status'], string> = { open: 'Open', invoiced: 'Invoice sent', paid: 'Paid' };
 
 export default function JobsScreen() {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
-  const store = useStore();
-  const { jobs, timeEntries, expenses, technicians: allTechs, prefs, saveJob, technicianName, activeFleet, clockIn, clockOut } = store;
+  const { jobs, timeEntries, expenses, technicians: allTechs, prefs, fleetAssets, saveJob, technicianName, activeFleet } = useStore();
   const { isOwner } = useCloud();
   // Only the owner can bill for or see other people. Everyone else works with their own profile.
   const technicians = isOwner
@@ -33,10 +32,10 @@ export default function JobsScreen() {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const [client, setClient] = useState('');
+  const [contact, setContact] = useState('');
   const [techId, setTechId] = useState<string>(prefs.meTechnicianId ?? NONE);
   const [rate, setRate] = useState(String(technicians.find((t) => t.id === prefs.meTechnicianId)?.hourlyRate ?? ''));
-  const [showPaid, setShowPaid] = useState(false);
-  const now = useNow(1000);
+  const [assetId, setAssetId] = useState<string>(NONE);
 
   // Earnings
   const [period, setPeriod] = useState<Period>('week');
@@ -48,15 +47,16 @@ export default function JobsScreen() {
     if (r !== undefined) setRate(String(r));
   };
 
-  const create = (start: boolean) => {
+  const create = () => {
     const r = parseMoney(rate || '0');
     const { error, id } = saveJob({
       title,
       client: client.trim() || undefined,
+      clientContact: contact.trim() || undefined,
       technicianId: isOwner ? (techId === NONE ? undefined : techId) : prefs.meTechnicianId,
+      assetId: assetId === NONE ? undefined : assetId,
       fleetId: activeFleet.id,
       rate: r,
-      clockStartedAt: start ? new Date().toISOString() : undefined,
     });
     if (error || !id) {
       Alert.alert('Cannot create job', error ?? '');
@@ -65,14 +65,15 @@ export default function JobsScreen() {
     setAdding(false);
     setTitle('');
     setClient('');
+    setContact('');
     router.push({ pathname: '/jobs/[id]', params: { id } });
   };
 
   const sorted = [...jobs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  // Running clocks first, then the other open jobs.
-  const active = sorted.filter((j) => j.status === 'open').sort((a, b) => Number(!!b.clockStartedAt) - Number(!!a.clockStartedAt));
-  const sent = sorted.filter((j) => j.status === 'invoiced');
-  const paid = sorted.filter((j) => j.status === 'paid');
+  const groups: { status: Job['status']; items: Job[] }[] = (['open', 'invoiced', 'paid'] as const).map((st) => ({
+    status: st,
+    items: sorted.filter((j) => j.status === st),
+  }));
 
   const data = buckets(period, jobs, timeEntries, expenses, who === ALL ? undefined : who);
   const cur = data[data.length - 1];
@@ -87,13 +88,13 @@ export default function JobsScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
-      <Stack.Screen options={{ title: tab === 'jobs' ? 'Time clock' : 'Earnings' }} />
+      <Stack.Screen options={{ title: 'Invoices & earnings' }} />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <View style={{ marginBottom: spacing.lg }}>
           <ChipSelect
             options={[
-              { value: 'jobs', label: 'Time clock' },
-              { value: 'earnings', label: 'Earnings' },
+              { value: 'jobs', label: 'Jobs & invoices' },
+              { value: 'earnings', label: 'Earnings & expenses' },
             ]}
             value={tab}
             onChange={(v) => setTab(v as Tab)}
@@ -102,115 +103,67 @@ export default function JobsScreen() {
 
         {tab === 'jobs' ? (
           <>
-            {active.map((j) => {
-              const t = liveTotals(j, timeEntries, expenses, now);
-              const running = !!j.clockStartedAt;
-              return (
-                <Pressable
-                  key={j.id}
-                  onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: j.id } })}
-                  style={[s.clock, running && { borderColor: c.danger }]}
-                  accessibilityRole="button"
-                >
-                  <View style={s.clockTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.clockTitle} numberOfLines={1}>
-                        {j.title}
-                      </Text>
-                      <Text style={s.clockMeta} numberOfLines={1}>
-                        {[j.client, isOwner && j.technicianId ? technicianName(j.technicianId) : undefined, `${money(j.rate)}/h`].filter(Boolean).join(' · ')}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => (running ? clockOut(j.id) : clockIn(j.id))}
-                      style={[s.play, { backgroundColor: running ? c.danger : c.ok }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={running ? 'Stop the clock' : 'Start the clock'}
-                      hitSlop={6}
-                    >
-                      <Text style={s.playText}>{running ? '■' : '▶'}</Text>
-                    </Pressable>
-                  </View>
-                  <View style={s.clockBottom}>
-                    <View>
-                      <Text style={[s.clockTime, running && { color: c.danger }]}>{running ? clockText(t.running) : `${t.hours.toFixed(2)} h`}</Text>
-                      <Text style={s.clockMeta}>{running ? `running · ${t.hours.toFixed(2)} h total` : t.expenses ? `incl. ${money(t.expenses)} expenses` : 'stopped'}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={s.clockAmount}>{money(t.total)}</Text>
-                      <Pressable onPress={() => sendInvoice(store, j, 'pdf')} hitSlop={8} accessibilityRole="button">
-                        <Text style={s.link}>Send invoice ›</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-
             {adding ? (
               <Card style={{ marginBottom: spacing.lg }}>
-                <Field label="Job or customer" placeholder="e.g. Smith driveway" value={title} onChangeText={setTitle} autoFocus />
-                <Field label="Bill to (optional)" placeholder="Customer or company" value={client} onChangeText={setClient} />
-                <Field label="Hourly rate ($)" keyboardType="decimal-pad" placeholder="e.g. 85" value={rate} onChangeText={setRate} />
-                {isOwner && technicians.length > 1 ? (
+                <Field label="Job name" placeholder="e.g. Week of Oct 19, Smith driveway" value={title} onChangeText={setTitle} />
+                <Field label="Bill to" placeholder="Customer or company" value={client} onChangeText={setClient} />
+                <Field label="Customer phone / email" value={contact} onChangeText={setContact} autoCapitalize="none" />
+                {isOwner ? (
                   <>
                     <Text style={s.label}>Who is working</Text>
-                    <ChipSelect options={technicians.map((t) => ({ value: t.id, label: t.name }))} value={techId} onChange={pickTech} />
+                    <ChipSelect
+                      options={[...technicians.map((t) => ({ value: t.id, label: t.name })), { value: NONE, label: 'Not set' }]}
+                      value={techId}
+                      onChange={pickTech}
+                    />
                     <View style={{ height: spacing.md }} />
                   </>
                 ) : null}
-                <View style={s.two}>
+                <Field label="Hourly rate ($)" keyboardType="decimal-pad" placeholder="e.g. 85" value={rate} onChangeText={setRate} />
+                <Text style={s.label}>Machine (optional)</Text>
+                <ChipSelect
+                  options={[{ value: NONE, label: 'None' }, ...fleetAssets.map((a) => ({ value: a.id, label: a.name }))]}
+                  value={assetId}
+                  onChange={setAssetId}
+                />
+                <View style={[s.two, { marginTop: spacing.md }]}>
                   <Button title="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => setAdding(false)} />
-                  <Button title="▶ Start clock" style={{ flex: 1 }} onPress={() => create(true)} />
+                  <Button title="Create job" style={{ flex: 1 }} onPress={create} />
                 </View>
-                <Pressable onPress={() => create(false)} hitSlop={8} style={{ marginTop: spacing.sm, alignSelf: 'center' }}>
-                  <Text style={s.link}>Create without starting</Text>
-                </Pressable>
               </Card>
             ) : (
-              <Pressable onPress={() => setAdding(true)} style={s.newJob} accessibilityRole="button">
-                <Text style={s.newJobText}>+ New job</Text>
-              </Pressable>
+              <Button title="+ New job or work week" onPress={() => setAdding(true)} style={{ marginBottom: spacing.lg }} />
             )}
 
-            {!jobs.length && !adding ? <Muted>Tap + New job, then Start. Send the invoice whenever you're ready — the clock can keep running.</Muted> : null}
-
-            {sent.length ? (
-              <>
-                <Text style={s.group}>Waiting for payment</Text>
-                {sent.map((j) => (
-                  <ListRow
-                    key={j.id}
-                    title={j.title}
-                    subtitle={[j.client, `#${j.invoiceNumber}`, j.invoicedAt ? shortDate(j.invoicedAt) : undefined].filter(Boolean).join(' · ')}
-                    right={money(jobTotals(j, timeEntries, expenses).total)}
-                    dot={c.warn}
-                    onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: j.id } })}
-                  />
-                ))}
-              </>
-            ) : null}
-            {paid.length ? (
-              <>
-                <Pressable onPress={() => setShowPaid((v) => !v)} hitSlop={8}>
-                  <Text style={s.group}>
-                    Paid ({paid.length}) {showPaid ? '▲' : '▼'}
-                  </Text>
-                </Pressable>
-                {showPaid
-                  ? paid.map((j) => (
+            {jobs.length === 0 ? <Muted>No jobs yet. Create one to start tracking hours and expenses.</Muted> : null}
+            {groups
+              .filter((g) => g.items.length)
+              .map((g) => (
+                <View key={g.status} style={{ marginBottom: spacing.md }}>
+                  <SectionTitle>{`${STATUS_LABEL[g.status]} (${g.items.length})`}</SectionTitle>
+                  {g.items.map((j) => {
+                    const t = jobTotals(j, timeEntries, expenses);
+                    return (
                       <ListRow
                         key={j.id}
                         title={j.title}
-                        subtitle={[j.client, `#${j.invoiceNumber}`, j.checkNumber ? `check ${j.checkNumber}` : undefined].filter(Boolean).join(' · ')}
-                        right={money(jobTotals(j, timeEntries, expenses).total)}
-                        dot={c.ok}
+                        subtitle={[
+                          j.client,
+                          technicianName(j.technicianId) !== 'Unassigned' ? technicianName(j.technicianId) : undefined,
+                          `${t.hours} h`,
+                          j.invoiceNumber ? `#${j.invoiceNumber}` : undefined,
+                          j.status === 'paid' && j.checkNumber ? `check ${j.checkNumber}` : shortDate(j.createdAt),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') + `\n40% for taxes: ${money(t.total * 0.4)}`}
+                        right={money(t.total)}
+                        dot={j.status === 'paid' ? c.ok : j.status === 'invoiced' ? c.warn : c.accent}
                         onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: j.id } })}
                       />
-                    ))
-                  : null}
-              </>
-            ) : null}
+                    );
+                  })}
+                </View>
+              ))}
           </>
         ) : (
           <>
@@ -277,6 +230,7 @@ export default function JobsScreen() {
                 <Text style={[s.td, s.r, s.bold]}>{money(sum.income - sum.expenses)}</Text>
               </View>
             </Card>
+            <Text style={s.tax}>Set aside 40% for taxes: {money(cur.income * 0.4)} this {period} · {money(sum.income * 0.4)} for the chart period</Text>
             <Text style={s.note}>
               Income = hours × the job's hourly rate. Expenses = costs entered on jobs. Not yet paid: {money(unpaid)}.
             </Text>
@@ -303,17 +257,5 @@ const makeStyles = (c: Palette) =>
     r: { textAlign: 'right' },
     bold: { fontWeight: '800' },
     note: { color: c.muted, fontSize: 12, marginTop: spacing.md },
-    clock: { borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: spacing.md, marginBottom: spacing.sm, backgroundColor: c.card },
-    clockTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    clockTitle: { color: c.text, fontSize: 18, fontWeight: '800' },
-    clockMeta: { color: c.muted, fontSize: 13, marginTop: 2 },
-    play: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-    playText: { color: '#fff', fontSize: 20, fontWeight: '800' },
-    clockBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: spacing.md },
-    clockTime: { color: c.text, fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
-    clockAmount: { color: c.accent, fontSize: 22, fontWeight: '800' },
-    link: { color: c.accent, fontSize: 14, fontWeight: '700', marginTop: 4 },
-    newJob: { borderWidth: 1, borderStyle: 'dashed', borderColor: c.muted, borderRadius: 16, padding: spacing.md, alignItems: 'center', marginBottom: spacing.lg },
-    newJobText: { color: c.text, fontSize: 16, fontWeight: '700' },
-    group: { color: c.muted, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing.lg, marginBottom: spacing.sm },
+    tax: { color: c.warn, fontSize: 14, fontWeight: '700', marginTop: spacing.md },
   });

@@ -5,14 +5,14 @@ import { ListRow, SectionTitle } from '../../src/components/ui';
 import { useStore } from '../../src/store';
 import { Palette, spacing, useStyles } from '../../src/theme';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ embedded }: { embedded?: boolean } = {}) {
   const s = useStyles(makeStyles);
   const router = useRouter();
   const { fleets, assets, technicians, activeFleet, categories } = useStore();
 
   return (
     <View style={{ flex: 1 }}>
-      <Stack.Screen options={{ title: 'Settings' }} />
+      {embedded ? null : <Stack.Screen options={{ title: 'Settings' }} />}
       <ScrollView contentContainerStyle={s.content}>
         <Text style={s.active}>Viewing: {activeFleet.name}</Text>
 
@@ -72,6 +72,6 @@ export default function SettingsScreen() {
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
-    content: { padding: spacing.md, paddingBottom: spacing.lg * 3 },
+    content: { padding: spacing.md, paddingBottom: spacing.lg * 5 },
     active: { color: c.muted, fontSize: 14, marginBottom: spacing.md },
   });

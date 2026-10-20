@@ -1,3 +1,6 @@
+import { Inter_300Light, Inter_400Regular, Inter_500Medium } from '@expo-google-fonts/inter';
+import { Oswald_500Medium, Oswald_600SemiBold, Oswald_700Bold } from '@expo-google-fonts/oswald';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
@@ -8,7 +11,7 @@ import { ExcelProvider } from '../src/sheets/ExcelLink';
 import { AuthScreen } from '../src/screens/AuthScreen';
 import { Onboarding } from '../src/screens/Onboarding';
 import { StoreProvider, userStorageKey, useStore } from '../src/store';
-import { useTheme } from '../src/theme';
+import { font, useTheme } from '../src/theme';
 
 function Loading() {
   const { c } = useTheme();
@@ -38,7 +41,8 @@ function ThemedStack() {
         screenOptions={{
           headerStyle: { backgroundColor: c.bg },
           headerTintColor: c.text,
-          headerTitleStyle: { fontWeight: '800' },
+          headerTitleStyle: { fontFamily: font.heading, fontSize: 21 },
+          headerBackTitleStyle: { fontFamily: font.regular },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: c.bg },
         }}
@@ -73,6 +77,10 @@ function Gate() {
 }
 
 export default function RootLayout() {
+  // Rugged condensed headings (Oswald) and thin modern text (Inter). If loading fails the app
+  // still opens with the phone's own font.
+  const [loaded, error] = useFonts({ Oswald_500Medium, Oswald_600SemiBold, Oswald_700Bold, Inter_300Light, Inter_400Regular, Inter_500Medium });
+  if (!loaded && !error) return <Loading />;
   return (
     <AuthProvider>
       <Gate />
