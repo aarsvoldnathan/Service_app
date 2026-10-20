@@ -55,7 +55,14 @@ jobs:
           grep -n androidBuild app.json
 
       - name: Generate the Android project
-        run: npx expo prebuild --platform android --no-install
+        run: |
+          # On failure, show the end of the output as an error note (readable without the log).
+          npx expo prebuild --platform android --no-install > "$RUNNER_TEMP/prebuild.log" 2>&1 || {
+            cat "$RUNNER_TEMP/prebuild.log"
+            echo "::error title=prebuild::$(tail -n 40 "$RUNNER_TEMP/prebuild.log" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
+          tail -n 20 "$RUNNER_TEMP/prebuild.log"
 
       - name: Set version code
         # Each build gets a higher number so the new app installs over the old one.
@@ -66,7 +73,13 @@ jobs:
       - name: Build the APK
         working-directory: android
         # arm64 covers all current Android phones and keeps the build fast and the file small.
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+        run: |
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon > "$RUNNER_TEMP/gradle.log" 2>&1 || {
+            tail -n 200 "$RUNNER_TEMP/gradle.log"
+            echo "::error title=gradle::$(grep -E 'error|What went wrong|FAILED|Exception' "$RUNNER_TEMP/gradle.log" | head -n 25 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
+          tail -n 15 "$RUNNER_TEMP/gradle.log"
 
       - name: Publish to GitHub Releases
         env:

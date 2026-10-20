@@ -1,18 +1,19 @@
 // Android home-screen widget (react-native-android-widget). Plain widget primitives only.
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
-import type { WidgetSnapshot } from './snapshot';
+import type { Hex, WidgetSnapshot } from './snapshot';
 import { LEVEL_HEX } from './snapshot';
 
-const BG = '#181B20';
-const TEXT = '#F2F4F7';
-const MUTED = '#8B93A1';
-const ACCENT = '#FFB020';
+const BG: Hex = '#181B20';
+const TEXT: Hex = '#F2F4F7';
+const MUTED: Hex = '#8B93A1';
+const ACCENT: Hex = '#FFB020';
+const ON_ACCENT: Hex = '#1A1200';
 const OPEN = 'serviceceo://quick?scan=1';
 
 export function QuickHoursWidget({ data }: { data: WidgetSnapshot | null }) {
   const last = data?.last;
-  const color = last ? LEVEL_HEX[last.level] : MUTED;
+  const color: Hex = last ? LEVEL_HEX[last.level] : MUTED;
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -45,7 +46,7 @@ export function QuickHoursWidget({ data }: { data: WidgetSnapshot | null }) {
         clickActionData={{ uri: OPEN }}
         style={{ width: 'match_parent', height: 40, backgroundColor: ACCENT, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
       >
-        <TextWidget text="SCAN & UPDATE HOURS" style={{ fontSize: 14, color: '#1A1200', fontWeight: 'bold' }} />
+        <TextWidget text="SCAN & UPDATE HOURS" style={{ fontSize: 14, color: ON_ACCENT, fontWeight: 'bold' }} />
       </FlexWidget>
     </FlexWidget>
   );

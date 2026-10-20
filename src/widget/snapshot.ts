@@ -5,7 +5,8 @@ import { Level, LEVEL_LABEL, machineStatus, Thresholds } from '../maintenance';
 import type { Asset, ServiceTask } from '../types';
 
 export const WIDGET_KEY = 'service-ceo:widget';
-export const LEVEL_HEX: Record<Level, string> = { red: '#FF5A4F', orange: '#FB923C', yellow: '#FACC15', green: '#3DD68C' };
+export type Hex = `#${string}`;
+export const LEVEL_HEX: Record<Level, Hex> = { red: '#FF5A4F', orange: '#FB923C', yellow: '#FACC15', green: '#3DD68C' };
 
 export type WidgetSnapshot = {
   fleet: string;

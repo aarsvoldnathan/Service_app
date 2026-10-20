@@ -72,8 +72,17 @@ jobs:
         run: npx expo install --fix
       - name: Generate the Xcode project
         run: |
-          npx expo prebuild --platform ios --no-install
-          cd ios && pod install
+          npx expo prebuild --platform ios --no-install > "$RUNNER_TEMP/prebuild.log" 2>&1 || {
+            cat "$RUNNER_TEMP/prebuild.log"
+            echo "::error title=prebuild::$(tail -n 40 "$RUNNER_TEMP/prebuild.log" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
+          tail -n 20 "$RUNNER_TEMP/prebuild.log"
+          cd ios && pod install > "$RUNNER_TEMP/pod.log" 2>&1 || {
+            cat "$RUNNER_TEMP/pod.log"
+            echo "::error title=pod install::$(tail -n 40 "$RUNNER_TEMP/pod.log" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
       - name: Find workspace and set build number
         run: |
           WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
@@ -88,7 +97,12 @@ jobs:
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO \
-            build | tail -n 80
+            build > "$RUNNER_TEMP/xcode.log" 2>&1 || {
+              tail -n 120 "$RUNNER_TEMP/xcode.log"
+              echo "::error title=xcodebuild::$(grep -E 'error:|\*\* BUILD FAILED' "$RUNNER_TEMP/xcode.log" | head -n 25 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+              exit 1
+            }
+          tail -n 20 "$RUNNER_TEMP/xcode.log"
       - name: Check upload credentials
         if: env.UPLOAD == 'true'
         env:
