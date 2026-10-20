@@ -47,8 +47,8 @@ jobs:
 
   ios:
     needs: typecheck
-    runs-on: macos-latest
-    timeout-minutes: 60
+    runs-on: macos-15-intel
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
