@@ -37,7 +37,13 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Bundle the JavaScript for iPhone
-        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/export"
+        run: |
+          npx expo export --platform ios --output-dir "$RUNNER_TEMP/export" > "$RUNNER_TEMP/export.log" 2>&1 || {
+            cat "$RUNNER_TEMP/export.log"
+            echo "::error title=export::$(tail -n 40 "$RUNNER_TEMP/export.log" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
+          tail -n 5 "$RUNNER_TEMP/export.log"
 
   ios:
     needs: typecheck

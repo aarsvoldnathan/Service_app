@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@bacons/apple-targets": "^3.0.2",
+    "@expo/prebuild-config": "~54.0.0",
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2"
   }
