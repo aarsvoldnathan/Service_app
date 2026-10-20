@@ -42,7 +42,7 @@ def request(url, payload=None):
             details = "Apple API rejected request"
         raise RuntimeError("Apple returned HTTP " + str(error.code) + ": " + details) from None
 
-for identifier, name in (("com.aarsvold.serviceceo", "Service Ceo"),):
+for identifier, name in (("com.aarsvold.serviceceo", "Service Ceo"), ("com.aarsvold.serviceceo.widget", "Service Ceo Widget")):
     query = urllib.parse.urlencode({"filter[identifier]": identifier})
     response = request(BASE + "?" + query)
     if response.get("data"):

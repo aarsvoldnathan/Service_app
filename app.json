@@ -35,7 +35,25 @@
           "cameraPermission": "Service Ceo uses the camera to scan machine barcodes and photograph receipts."
         }
       ],
-      "expo-quick-actions"
+      "expo-quick-actions",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "QuickHours",
+              "label": "Service Ceo \u2013 Quick hours",
+              "description": "Scan a machine and update its hours",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      "@bacons/apple-targets"
     ]
   }
 }

@@ -10,6 +10,7 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth';
 import { CloudProvider } from '../src/cloud';
 import { ExcelProvider } from '../src/sheets/ExcelLink';
+import { WidgetSync } from '../src/widget/WidgetSync';
 import { AuthScreen } from '../src/screens/AuthScreen';
 import { Onboarding } from '../src/screens/Onboarding';
 import { StoreProvider, userStorageKey, useStore } from '../src/store';
@@ -86,6 +87,7 @@ function Gate() {
     <StoreProvider key={userId} storageKey={userStorageKey(userId)}>
       <CloudProvider>
         <ExcelProvider>
+          <WidgetSync />
           <ThemedStack />
         </ExcelProvider>
       </CloudProvider>
