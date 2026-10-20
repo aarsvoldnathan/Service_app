@@ -17,8 +17,8 @@ struct QuickHoursProvider: TimelineProvider {
   }
 }
 
-private let accent = Color(red: 1.0, green: 0.69, blue: 0.125)
-private let background = Color(red: 0.094, green: 0.106, blue: 0.125)
+private let widgetAccent = Color(red: 1.0, green: 0.69, blue: 0.125)
+private let widgetBackground = Color(red: 0.094, green: 0.106, blue: 0.125)
 
 struct QuickHoursView: View {
   @Environment(\.widgetFamily) var family
@@ -30,7 +30,7 @@ struct QuickHoursView: View {
         Image(systemName: "wrench.fill").font(.system(size: 12, weight: .bold))
         Text("SERVICE CEO").font(.system(size: 12, weight: .heavy)).kerning(1)
       }
-      .foregroundColor(accent)
+      .foregroundColor(widgetAccent)
       Spacer(minLength: 0)
       Image(systemName: "barcode.viewfinder")
         .font(.system(size: family == .systemSmall ? 34 : 40, weight: .semibold))
@@ -40,7 +40,7 @@ struct QuickHoursView: View {
         .foregroundColor(.white)
       Text("HOURS")
         .font(.system(size: 15, weight: .heavy))
-        .foregroundColor(accent)
+        .foregroundColor(widgetAccent)
       if family != .systemSmall {
         Text("Find a machine, enter hours, see if service is due.")
           .font(.system(size: 12, weight: .light))
@@ -53,9 +53,9 @@ struct QuickHoursView: View {
 
   var body: some View {
     if #available(iOS 17.0, *) {
-      content.containerBackground(background, for: .widget)
+      content.containerBackground(widgetBackground, for: .widget)
     } else {
-      content.padding().background(background)
+      content.padding().background(widgetBackground)
     }
   }
 }
