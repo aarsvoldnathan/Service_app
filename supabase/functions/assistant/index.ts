@@ -23,6 +23,7 @@ type Machine = {
   year?: string;
   serial?: string;
   category?: string;
+  officialDomains?: string[];
   currentHours?: number;
   specFields?: { id: string; label: string }[];
   specs?: Record<string, string>;
@@ -45,7 +46,7 @@ const PROPOSE_TOOL = {
   name: 'propose_changes',
   description:
     'Propose service specs, parts and maintenance schedule items for this machine. The person reviews and chooses what to apply. ' +
-    'Only include values you found in manufacturer documentation or reliable dealer/parts sources; never guess part numbers.',
+    'Only include values you found in manufacturer documentation (or, failing that, authorized dealer parts lookups); never guess part numbers. In caveats, list any values that did not come from the manufacturer.',
   input_schema: {
     type: 'object',
     properties: {
@@ -101,6 +102,7 @@ function machineText(m: Machine): string {
     `Make: ${m.make ?? 'unknown'} | Model: ${m.model ?? 'unknown'} | Year: ${m.year ?? 'unknown'} | Serial number: ${m.serial || 'unknown'}`,
     `Type: ${m.category ?? 'unknown'} | Current hour meter: ${m.currentHours ?? 'unknown'} h`,
   ];
+  if (m.officialDomains?.length) lines.push(`Official manufacturer domains (search these first): ${m.officialDomains.join(', ')}`);
   if (m.specFields?.length) {
     lines.push('Spec fields used by the app (field_id: label = current value):');
     m.specFields.forEach((f) => lines.push(`- ${f.id}: ${f.label} = ${m.specs?.[f.id] || '(empty)'}`));
@@ -122,10 +124,22 @@ function machineText(m: Machine): string {
 
 const SYSTEM_BASE = `You are the service assistant inside Service Ceo, an app that tracks maintenance for compact equipment (skid steers, track loaders, excavators, chippers, lifts, mowers, trailers) for rental fleets and households.
 You help technicians while they work on a machine and help owners set machines up.
-- Use web search to find the manufacturer's maintenance schedule, capacities, torque values and part numbers for the exact make and model. Prefer the manufacturer (e.g. bobcat.com, kubota.com, assets/service-schedule PDFs) and authorized dealers or parts catalogs. Note when values depend on serial-number range or model year.
+- SOURCE ORDER (most to least trusted): 1) the manufacturer's own operation & maintenance manual, service schedule chart or parts catalog (official domains are listed with the machine); 2) authorized dealer parts lookups; 3) engine/component makers (e.g. Kubota, Yanmar, Perkins engines; Donaldson/Fleetguard cross-reference) only to confirm. Never use forums, marketplaces or random PDF mirror sites for numbers.
+- Search the official domains first. Only widen the search if the manufacturer has nothing for that value, and say which values did NOT come from the manufacturer.
+- Note when values depend on serial-number range or model year.
 - Never make up part numbers, torque values or capacities. If you cannot find a value, say so and tell them where to look (operator's manual, decal on the machine, dealer).
 - Put safety first: mention lowering attachments, relieving hydraulic pressure, lockout, hot fluids and jacking safety when relevant.
 - Write for someone standing at the machine on a phone: short, plain, step-by-step, units included.`;
+
+function isOfficial(u: string, domains?: string[]) {
+  if (!domains?.length) return false;
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return domains.some((d) => h === d || h.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
 
 async function callClaude(apiKey: string, payload: Record<string, unknown>) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -243,7 +257,10 @@ ${context}`;
     return json({
       text: text.trim(),
       proposal,
-      sources: Array.from(sources, ([u, t]) => ({ url: u, title: t })).slice(0, 8),
+      // Manufacturer pages first.
+      sources: Array.from(sources, ([u, t]) => ({ url: u, title: t }))
+        .sort((a, b) => Number(isOfficial(b.url, m.officialDomains)) - Number(isOfficial(a.url, m.officialDomains)))
+        .slice(0, 8),
       usage: { remainingToday: typeof count === 'number' ? Math.max(0, DAILY_LIMIT - count) : undefined },
     });
   } catch (e) {

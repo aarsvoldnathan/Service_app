@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AssignmentCard } from '../src/components/AssignmentCard';
 import { HoursRow } from '../src/components/HoursRow';
+import { ManualLinks } from '../src/components/ManualLinks';
 import { ScheduleEditor } from '../src/components/ScheduleEditor';
 import { ServiceForm } from '../src/components/ServiceForm';
 import { SpecsCard } from '../src/components/SpecsCard';
@@ -146,6 +147,7 @@ export default function ServiceScreen() {
                 </Pressable>
                 {showIntervals && <ScheduleEditor asset={asset} thresholds={thresholds} />}
               </Card>
+              <ManualLinks asset={asset} />
             </View>
 
             <View style={s.section}>

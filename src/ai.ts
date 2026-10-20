@@ -1,4 +1,5 @@
 import { computeDue, Thresholds } from './maintenance';
+import { makerFor } from './manuals';
 import { supabase } from './supabase';
 import { Asset, Category, ServiceLog, ServiceTask } from './types';
 
@@ -43,6 +44,7 @@ export function machineContext(
     year: asset.year,
     serial: asset.serial,
     category: category.name,
+    officialDomains: makerFor(asset.make)?.domains ?? [],
     currentHours: asset.currentHours,
     specFields: category.fields.map((f) => ({ id: f.id, label: f.label })),
     specs: asset.specs.values,

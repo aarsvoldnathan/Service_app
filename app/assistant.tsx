@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { AiAnswer, askAssistant, ChatTurn, machineContext } from '../src/ai';
+import { ManualLinks } from '../src/components/ManualLinks';
 import { ProposalCard } from '../src/components/ProposalCard';
+import { isOfficial } from '../src/manuals';
 import { Button, ChipSelect, Input, Muted } from '../src/components/ui';
 import { useStore } from '../src/store';
 import { Palette, radius, spacing, useStyles, useTheme } from '../src/theme';
@@ -124,6 +126,7 @@ export default function AssistantScreen() {
             <View style={{ marginBottom: spacing.md }}>
               <ChipSelect options={QUICK.map((q) => ({ value: q, label: q }))} value={undefined} onChange={(q) => run('chat', q)} />
             </View>
+            <ManualLinks asset={asset} />
           </View>
         )}
 
@@ -136,10 +139,11 @@ export default function AssistantScreen() {
               <View style={s.sources}>
                 <Text style={s.sourcesTitle}>Sources</Text>
                 {m.answer.sources.map((src) => (
-                  <Pressable key={src.url} onPress={() => Linking.openURL(src.url)} accessibilityRole="link">
+                  <Pressable key={src.url} onPress={() => Linking.openURL(src.url)} accessibilityRole="link" style={s.sourceRow}>
                     <Text style={s.source} numberOfLines={1}>
                       {src.title}
                     </Text>
+                    {isOfficial(src.url, asset.make) ? <Text style={s.badge}>OFFICIAL</Text> : null}
                   </Pressable>
                 ))}
               </View>
@@ -191,7 +195,9 @@ const makeStyles = (c: Palette) =>
     userText: { color: c.onAccent, fontWeight: '600' },
     sources: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: spacing.sm },
     sourcesTitle: { color: c.muted, fontSize: 12, fontWeight: '800', marginBottom: 2 },
-    source: { color: c.accent, fontSize: 13, paddingVertical: 3 },
+    sourceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    source: { color: c.accent, fontSize: 13, paddingVertical: 3, flex: 1 },
+    badge: { color: c.ok, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: c.ok, borderRadius: 4, paddingHorizontal: 4 },
     thinking: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
     disclaimer: { color: c.muted, fontSize: 11, marginTop: spacing.md, textAlign: 'center' },
     bar: {
