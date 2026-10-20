@@ -2,7 +2,7 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ChipSelect, levelColor, Muted } from '../src/components/ui';
-import { Level, LEVEL_LABEL, LEVEL_RANK, machineStatus } from '../src/maintenance';
+import { getRecentLogs, Level, LEVEL_LABEL, LEVEL_RANK, machineStatus } from '../src/maintenance';
 import { useStore } from '../src/store';
 import { font, Palette, radius, spacing, useStyles, useTheme } from '../src/theme';
 
@@ -12,7 +12,7 @@ export default function StatusScreen({ embedded }: { embedded?: boolean } = {}) 
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
-  const { fleetAssets, tasks, assignments, thresholds, activeFleet, technicianName } = useStore();
+  const { fleetAssets, tasks, logs, assignments, thresholds, activeFleet, technicianName } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
 
   const now = new Date();
@@ -20,6 +20,10 @@ export default function StatusScreen({ embedded }: { embedded?: boolean } = {}) 
     .map((a) => machineStatus(a, tasks, now, thresholds))
     .sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || a.asset.name.localeCompare(b.asset.name))
     .filter((r) => filter === 'all' || r.level !== 'green');
+
+  const ids = new Set(fleetAssets.map((a) => a.id));
+  const recent = getRecentLogs(logs.filter((l) => ids.has(l.assetId)), now, 30);
+  const assetName = (id: string) => fleetAssets.find((a) => a.id === id)?.name ?? 'Machine';
 
   const counts = (['red', 'orange', 'yellow', 'green'] as Level[]).map((l) => ({
     level: l,
@@ -91,6 +95,31 @@ export default function StatusScreen({ embedded }: { embedded?: boolean } = {}) 
             );
           })
         )}
+
+        <Text style={s.recentTitle}>Recently done (30 days)</Text>
+        {recent.length === 0 ? (
+          <Muted>No services logged in the last 30 days.</Muted>
+        ) : (
+          <View style={s.recentList}>
+            {recent.map((l, i) => (
+              <Pressable
+                key={l.id}
+                onPress={() => router.push({ pathname: '/machine/[id]', params: { id: l.assetId } })}
+                style={[s.recentRow, i > 0 && s.recentDivider]}
+                accessibilityRole="button"
+              >
+                <View style={[s.badge, { width: 10, height: 10, backgroundColor: c.ok }]} />
+                <Text style={s.recentMachine} numberOfLines={1}>
+                  {assetName(l.assetId)}
+                </Text>
+                <Text style={s.recentTask} numberOfLines={1}>
+                  {l.taskName} · {l.performedBy}
+                </Text>
+                <Text style={s.recentDate}>{new Date(l.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -131,5 +160,12 @@ const makeStyles = (c: Palette) =>
     level: { fontSize: 14, fontFamily: font.headingMedium, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4, marginBottom: 4 },
     need: { color: c.text, fontSize: 14, fontFamily: font.light, marginTop: 2 },
     more: { color: c.muted, fontSize: 13, marginTop: 2 },
+    recentTitle: { color: c.muted, fontSize: 15, fontFamily: font.heading, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: spacing.lg, marginBottom: spacing.sm },
+    recentList: { backgroundColor: c.card, borderColor: c.border, borderWidth: 1, borderRadius: radius, paddingHorizontal: spacing.md },
+    recentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    recentDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
+    recentMachine: { color: c.text, fontSize: 16, fontFamily: font.heading, maxWidth: '34%' },
+    recentTask: { color: c.muted, fontSize: 14, fontFamily: font.light, flex: 1 },
+    recentDate: { color: c.muted, fontSize: 13, fontFamily: font.regular },
     assigned: { color: c.accent, fontSize: 14, fontWeight: '700', marginTop: spacing.sm },
   });

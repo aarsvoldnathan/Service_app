@@ -6,7 +6,7 @@ import { HoursRow } from '../components/HoursRow';
 import { Tile } from '../components/Tile';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { Button, levelColor, Muted, SectionTitle } from '../components/ui';
-import { DueInfo, getDueList, getRecentLogs, getStaleAssets, machineStatus } from '../maintenance';
+import { DueInfo, getDueList, getStaleAssets, machineStatus } from '../maintenance';
 import { useStore } from '../store';
 import { font, Palette, radius, spacing, useStyles, useTheme } from '../theme';
 
@@ -20,7 +20,7 @@ export function HomePage({ onShowStatus }: { onShowStatus: () => void }) {
   const s = useStyles(makeStyles);
   const { c } = useTheme();
   const router = useRouter();
-  const { activeFleet, fleetAssets, tasks, logs, assignments, thresholds, prefs, updateHours, shopping, jobs } = useStore();
+  const { activeFleet, fleetAssets, tasks, assignments, thresholds, prefs, updateHours, shopping, jobs } = useStore();
 
   const now = new Date();
   const ids = new Set(fleetAssets.map((a) => a.id));
@@ -28,11 +28,9 @@ export function HomePage({ onShowStatus }: { onShowStatus: () => void }) {
   const overdue = due.filter((d) => d.status === 'overdue');
   const needing = fleetAssets.filter((a) => machineStatus(a, tasks, now, thresholds).level !== 'green');
   const stale = getStaleAssets(fleetAssets, now, activeFleet.staleHoursDays);
-  const recent = getRecentLogs(logs.filter((l) => ids.has(l.assetId)), now, 30).slice(0, 5);
   const open = assignments.filter((a) => a.status === 'open' && ids.has(a.assetId));
   const mine = open.filter((a) => a.technicianId === prefs.meTechnicianId || !a.technicianId);
   const others = open.filter((a) => !mine.includes(a));
-  const assetName = (id: string) => fleetAssets.find((a) => a.id === id)?.name ?? 'Unknown';
 
   const openService = (assetId?: string) => router.push(assetId ? { pathname: '/service', params: { assetId } } : '/service');
   const openMachine = (id: string) => router.push({ pathname: '/machine/[id]', params: { id } });
@@ -115,27 +113,6 @@ export function HomePage({ onShowStatus }: { onShowStatus: () => void }) {
         </View>
       )}
 
-      <View style={s.section}>
-        <SectionTitle>Recently done</SectionTitle>
-        {recent.length === 0 ? (
-          <Muted>No services logged in the last 30 days.</Muted>
-        ) : (
-          <View style={s.list}>
-            {recent.map((l, i) => (
-              <Pressable key={l.id} onPress={() => openMachine(l.assetId)} style={[s.dueRow, i > 0 && s.divider]} accessibilityRole="button">
-                <View style={[s.dot, { backgroundColor: c.ok }]} />
-                <Text style={s.dueMachine} numberOfLines={1}>
-                  {assetName(l.assetId)}
-                </Text>
-                <Text style={s.dueTask} numberOfLines={1}>
-                  {l.taskName}
-                </Text>
-                <Text style={s.doneWhen}>{new Date(l.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
     </ScrollView>
   );
 }
