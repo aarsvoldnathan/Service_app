@@ -61,6 +61,11 @@ export default function SettingsScreen({ embedded }: { embedded?: boolean } = {}
         <View style={{ height: spacing.md }} />
         <SectionTitle>App</SectionTitle>
         <ListRow
+          title="Invoice & tax settings"
+          subtitle="Tax rate, business details, hourly rate, weekly hours text"
+          onPress={() => router.push('/settings/invoicing')}
+        />
+        <ListRow
           title="Preferences and invoices"
           subtitle="Theme, who uses this phone, business info for invoices"
           onPress={() => router.push('/settings/preferences')}

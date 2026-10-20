@@ -71,7 +71,7 @@ async function html({ job, number, entries, expenses, business, technician, mach
     <tr class="tot"><td>Parts and expenses</td><td class="r">${money(t.expenses)}</td></tr>
     <tr class="grand"><td>${paid ? 'Total paid' : 'Total due'}</td><td class="r">${money(t.total)}</td></tr>
   </table>
-  ${job.notes ? `<div class="box"><b>Notes:</b> ${esc(job.notes)}</div>` : ''}
+  ${job.notes || business.terms ? `<div class="box"><b>Notes:</b> ${esc(job.notes || business.terms)}</div>` : ''}
   ${paid ? `<p class="muted">Paid ${job.paidAt ? shortDate(job.paidAt) : ''}${job.checkNumber ? ` by check #${esc(job.checkNumber)}` : ''}. Thank you!</p>` : '<p class="muted">Thank you for your business.</p>'}
   ${receipts.map((r) => `<div class="rec"><b>Receipt:</b> ${esc(r.e.description)} · ${money(r.e.amount)} · ${shortDate(r.e.date)}<img src="${r.url}"></div>`).join('')}
   </body></html>`;

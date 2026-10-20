@@ -2,9 +2,9 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ExpenseSheet } from '../components/ExpenseSheet';
-import { Button, Card, ChipSelect, Field, Muted, SectionTitle } from '../components/ui';
+import { Button, Card, Field, Muted, SectionTitle } from '../components/ui';
 import { money, parseMoney, shortDate } from '../dates';
-import { jobTotals } from '../finance';
+import { jobTotals, taxPercent } from '../finance';
 import { DAY_SHORT, dayIso, fmtHours, md, parseSpan, sameDay, weekDays, weekStart, weekText } from '../hours';
 import { shareInvoicePdf, shareInvoiceText } from '../invoice';
 import { useStore } from '../store';
@@ -24,19 +24,15 @@ export function HoursPage() {
   const me = prefs.meTechnicianId;
   const setup = prefs.hours ?? {};
   const lunch = setup.lunch ?? 0;
+  const tax = taxPercent(prefs);
 
   const [start, setStart] = useState(() => weekStart(new Date()));
   const days = useMemo(() => weekDays(start), [start]);
   const [text, setText] = useState<Record<number, string>>({});
-  const [showSetup, setShowSetup] = useState(!setup.bossPhone && !setup.rate);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [check, setCheck] = useState('');
   const [editExpense, setEditExpense] = useState<Expense | undefined>();
-  const [bossName, setBossName] = useState(setup.bossName ?? '');
-  const [bossPhone, setBossPhone] = useState(setup.bossPhone ?? '');
-  const [billTo, setBillTo] = useState(setup.billTo ?? '');
-  const [rate, setRate] = useState(setup.rate ? String(setup.rate) : String(technicians.find((t) => t.id === me)?.hourlyRate ?? ''));
 
   const myJobs = jobs.filter((j) => j.weekly && j.technicianId === me);
   const myJobIds = new Set(myJobs.map((j) => j.id));
@@ -167,14 +163,6 @@ export function HoursPage() {
     ]);
   };
 
-  const saveSetup = () => {
-    const r = rate.trim() ? parseMoney(rate) : undefined;
-    if (r !== undefined && (!Number.isFinite(r) || r < 0)) return Alert.alert('Rate', 'Enter the hourly rate, e.g. 35.');
-    setPrefs({ hours: { ...setup, bossName: bossName.trim() || undefined, bossPhone: bossPhone.trim() || undefined, billTo: billTo.trim() || undefined, rate: r } });
-    if (running) saveJob({ ...running, rate: r ?? running.rate, client: billTo.trim() || bossName.trim() || running.client, clientContact: bossPhone.trim() || running.clientContact });
-    setShowSetup(false);
-  };
-
   const shift = (n: number) => setStart((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n * 7));
   const isThisWeek = weekStart(new Date()).getTime() === start.getTime();
   const today = new Date();
@@ -246,7 +234,7 @@ export function HoursPage() {
                 {inv.expenses ? ` + ${money(inv.expenses)} expenses` : ''}
                 {since ? ` · since ${shortDate(since)}` : ''}
               </Text>
-              <Text style={s.tax}>Set aside 40% for taxes: {money(inv.total * 0.4)}</Text>
+              <Text style={s.tax}>Set aside {tax}% for taxes: {money((inv.total * tax) / 100)}</Text>
             </View>
           </View>
 
@@ -326,35 +314,15 @@ export function HoursPage() {
         </Pressable>
       </View>
 
-      {/* Setup */}
-      <View style={{ marginTop: spacing.lg }}>
-        <Pressable onPress={() => setShowSetup((v) => !v)} hitSlop={8}>
-          <SectionTitle>{`Send to & rate ${showSetup ? '▲' : '▼'}`}</SectionTitle>
-        </Pressable>
-        {showSetup ? (
-          <Card>
-            <Field label="Boss name" placeholder="e.g. Mike" value={bossName} onChangeText={setBossName} />
-            <Field label="Boss phone (for the text)" placeholder="e.g. 612 555 0134" keyboardType="phone-pad" value={bossPhone} onChangeText={setBossPhone} />
-            <Field label="Bill to (on the invoice)" placeholder="Company name" value={billTo} onChangeText={setBillTo} />
-            <Field label="My hourly rate ($)" placeholder="e.g. 35" keyboardType="decimal-pad" value={rate} onChangeText={setRate} />
-            <Text style={s.label}>Unpaid lunch each day</Text>
-            <ChipSelect
-              options={[
-                { value: '0', label: 'None' },
-                { value: '0.5', label: '30 min' },
-                { value: '1', label: '1 hour' },
-              ]}
-              value={String(lunch)}
-              onChange={(v) => setPrefs({ hours: { ...setup, lunch: Number(v) } })}
-            />
-            <Button title="Save" onPress={saveSetup} style={{ marginTop: spacing.md }} />
-          </Card>
-        ) : (
-          <Text style={s.hint}>
-            {[setup.bossName && `Texts go to ${setup.bossName}`, `${money(rateNum)}/h`, setup.billTo && `bill to ${setup.billTo}`].filter(Boolean).join(' · ')}
-          </Text>
-        )}
-      </View>
+      <Pressable onPress={() => router.push('/settings/invoicing')} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
+        <Text style={s.hint}>
+          {[setup.bossName ? `Texts go to ${setup.bossName}` : 'Boss phone not set', `${money(rateNum)}/h`, setup.billTo && `bill to ${setup.billTo}`, lunch ? `${fmtHours(lunch)} h lunch` : '']
+            .filter(Boolean)
+            .join(' · ')}
+          {'  '}
+          <Text style={s.link}>⚙ Change</Text>
+        </Text>
+      </Pressable>
 
       <ExpenseSheet job={running ?? ensureJobPreview(me, myName, rateNum, activeFleet.id)} expense={editExpense} visible={expenseOpen} onClose={() => setExpenseOpen(false)} onBeforeSave={() => ensureJob()} />
     </ScrollView>

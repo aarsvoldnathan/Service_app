@@ -125,3 +125,6 @@ export function buckets(
   });
   return list;
 }
+
+/** Tax set-aside percent from preferences (default 40%). */
+export const taxPercent = (prefs: { taxRate?: number }) => (prefs.taxRate !== undefined && Number.isFinite(prefs.taxRate) ? prefs.taxRate : 40);

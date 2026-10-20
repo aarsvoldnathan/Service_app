@@ -2,9 +2,9 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from '../../src/components/BarChart';
-import { Button, Card, ChipSelect, Field, ListRow, Muted, SectionTitle } from '../../src/components/ui';
+import { Button, Card, ChipSelect, Field, HeaderButton, ListRow, Muted, SectionTitle } from '../../src/components/ui';
 import { money, parseMoney, shortDate } from '../../src/dates';
-import { buckets, jobTotals, Period, PERIOD_LABEL } from '../../src/finance';
+import { buckets, jobTotals, Period, PERIOD_LABEL, taxPercent } from '../../src/finance';
 import { useCloud } from '../../src/cloud';
 import { useStore } from '../../src/store';
 import { Palette, radius, spacing, useStyles, useTheme } from '../../src/theme';
@@ -27,14 +27,15 @@ export default function JobsScreen() {
     ? allTechs.filter((t) => activeFleet.memberIds.includes(t.id))
     : allTechs.filter((t) => t.id === prefs.meTechnicianId);
   const [tab, setTab] = useState<Tab>('jobs');
+  const tax = taxPercent(prefs);
 
   // New job form
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
-  const [client, setClient] = useState('');
+  const [client, setClient] = useState(prefs.hours?.billTo ?? '');
   const [contact, setContact] = useState('');
   const [techId, setTechId] = useState<string>(prefs.meTechnicianId ?? NONE);
-  const [rate, setRate] = useState(String(technicians.find((t) => t.id === prefs.meTechnicianId)?.hourlyRate ?? ''));
+  const [rate, setRate] = useState(String(technicians.find((t) => t.id === prefs.meTechnicianId)?.hourlyRate ?? prefs.hours?.rate ?? ''));
   const [assetId, setAssetId] = useState<string>(NONE);
 
   // Earnings
@@ -64,7 +65,7 @@ export default function JobsScreen() {
     }
     setAdding(false);
     setTitle('');
-    setClient('');
+    setClient(prefs.hours?.billTo ?? '');
     setContact('');
     router.push({ pathname: '/jobs/[id]', params: { id } });
   };
@@ -88,7 +89,12 @@ export default function JobsScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
-      <Stack.Screen options={{ title: 'Invoices & earnings' }} />
+      <Stack.Screen
+        options={{
+          title: 'Invoices & earnings',
+          headerRight: () => <HeaderButton title="⚙ Settings" label="Invoice and tax settings" onPress={() => router.push('/settings/invoicing')} />,
+        }}
+      />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <View style={{ marginBottom: spacing.lg }}>
           <ChipSelect
@@ -155,7 +161,7 @@ export default function JobsScreen() {
                           j.status === 'paid' && j.checkNumber ? `check ${j.checkNumber}` : shortDate(j.createdAt),
                         ]
                           .filter(Boolean)
-                          .join(' · ') + `\n40% for taxes: ${money(t.total * 0.4)}`}
+                          .join(' · ') + `\n${tax}% for taxes: ${money((t.total * tax) / 100)}`}
                         right={money(t.total)}
                         dot={j.status === 'paid' ? c.ok : j.status === 'invoiced' ? c.warn : c.accent}
                         onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: j.id } })}
@@ -230,7 +236,7 @@ export default function JobsScreen() {
                 <Text style={[s.td, s.r, s.bold]}>{money(sum.income - sum.expenses)}</Text>
               </View>
             </Card>
-            <Text style={s.tax}>Set aside 40% for taxes: {money(cur.income * 0.4)} this {period} · {money(sum.income * 0.4)} for the chart period</Text>
+            <Text style={s.tax}>Set aside {tax}% for taxes: {money((cur.income * tax) / 100)} this {period} · {money((sum.income * tax) / 100)} for the chart period</Text>
             <Text style={s.note}>
               Income = hours × the job's hourly rate. Expenses = costs entered on jobs. Not yet paid: {money(unpaid)}.
             </Text>

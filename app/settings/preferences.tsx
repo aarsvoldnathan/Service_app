@@ -1,8 +1,8 @@
 import Constants from 'expo-constants';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button, Card, ChipSelect, Field, SectionTitle } from '../../src/components/ui';
+import { Button, Card, ChipSelect, Field, ListRow, SectionTitle } from '../../src/components/ui';
 import { useAuth } from '../../src/auth';
 import { ROLE_LABEL, useCloud } from '../../src/cloud';
 import { ANDROID_BUILD } from '../../src/config';
@@ -11,6 +11,7 @@ import { ACCENTS, AccentKey, Palette, spacing, ThemeMode, useStyles } from '../.
 
 export default function PreferencesScreen() {
   const s = useStyles(makeStyles);
+  const router = useRouter();
   const { prefs, setPrefs, activeFleet } = useStore();
   const { email, signOut } = useAuth();
   const { myRole, lastSync, syncError } = useCloud();
@@ -43,42 +44,9 @@ export default function PreferencesScreen() {
 
 
 
-        <SectionTitle>Invoice details</SectionTitle>
-        <Card style={s.card}>
-          <Field
-            label="Business name"
-            value={prefs.business.name ?? ''}
-            onChangeText={(v) => setPrefs({ business: { ...prefs.business, name: v || undefined } })}
-          />
-          <Field
-            label="Phone"
-            keyboardType="phone-pad"
-            value={prefs.business.phone ?? ''}
-            onChangeText={(v) => setPrefs({ business: { ...prefs.business, phone: v || undefined } })}
-          />
-          <Field
-            label="Email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={prefs.business.email ?? ''}
-            onChangeText={(v) => setPrefs({ business: { ...prefs.business, email: v || undefined } })}
-          />
-          <Field
-            label="Address"
-            multiline
-            value={prefs.business.address ?? ''}
-            onChangeText={(v) => setPrefs({ business: { ...prefs.business, address: v || undefined } })}
-          />
-          <Field
-            label="Next invoice number"
-            keyboardType="number-pad"
-            value={String(prefs.business.nextInvoiceNumber)}
-            onChangeText={(v) => {
-              const n = parseInt(v, 10);
-              if (Number.isFinite(n) && n > 0) setPrefs({ business: { ...prefs.business, nextInvoiceNumber: n } });
-            }}
-          />
-        </Card>
+        <SectionTitle>Invoices</SectionTitle>
+        <ListRow title="Invoice & tax settings" subtitle="Tax rate, business details, rate, weekly hours text" onPress={() => router.push('/settings/invoicing')} />
+        <View style={{ height: spacing.md }} />
 
         <SectionTitle>Account</SectionTitle>
         <Card style={s.card}>

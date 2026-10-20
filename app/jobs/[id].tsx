@@ -4,7 +4,7 @@ import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollV
 import { ExpenseSheet } from '../../src/components/ExpenseSheet';
 import { Button, Card, ChipSelect, Field, Muted, SectionTitle } from '../../src/components/ui';
 import { money, parseDate, parseMoney, shortDate, todayText } from '../../src/dates';
-import { jobTotals } from '../../src/finance';
+import { jobTotals, taxPercent } from '../../src/finance';
 import { shareInvoicePdf, shareInvoiceText } from '../../src/invoice';
 import { deleteReceipt } from '../../src/receipts';
 import { useCloud } from '../../src/cloud';
@@ -55,6 +55,7 @@ export default function JobScreen() {
   const totals = jobTotals(job, timeEntries, expenses);
   const machine = assets.find((a) => a.id === job.assetId)?.name;
   const locked = job.status === 'paid';
+  const tax = taxPercent(prefs);
 
   const addTime = () => {
     const date = parseDate(tDate);
@@ -188,7 +189,9 @@ export default function JobScreen() {
               <Text style={s.totalLabel}>Total</Text>
             </View>
           </View>
-          <Text style={s.tax}>40% for taxes: {money(totals.total * 0.4)} · you keep {money(totals.total * 0.6)}</Text>
+          <Text style={s.tax}>
+            {tax}% for taxes: {money((totals.total * tax) / 100)} · you keep {money(totals.total - (totals.total * tax) / 100)}
+          </Text>
         </View>
 
         {/* Invoice actions */}

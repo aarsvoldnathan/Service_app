@@ -144,6 +144,8 @@ export type Preferences = {
   business: BusinessInfo;
   /** Hours page: who the weekly hours text goes to, and defaults for the running invoice. */
   hours?: HoursSetup;
+  /** Percent of income set aside for taxes (default 40). */
+  taxRate?: number;
 };
 
 export type HoursSetup = {
@@ -162,6 +164,8 @@ export type BusinessInfo = {
   email?: string;
   address?: string;
   nextInvoiceNumber: number;
+  /** Printed on every invoice unless a job has its own notes, e.g. "Payment due in 7 days". */
+  terms?: string;
 };
 
 export type ShoppingItem = {
