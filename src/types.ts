@@ -186,6 +186,8 @@ export type Job = {
   paidAt?: string;
   checkNumber?: string;
   notes?: string;
+  /** Set while the time clock is running on this job (ISO time it started). */
+  clockStartedAt?: string;
 };
 
 export type TimeEntry = {

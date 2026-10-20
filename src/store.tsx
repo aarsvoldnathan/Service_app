@@ -154,6 +154,10 @@ type StoreValue = AppData & {
   markPaid: (jobId: string, checkNumber: string) => Result;
   reopenJob: (jobId: string) => void;
   saveTimeEntry: (e: Omit<TimeEntry, 'id'> & { id?: string }) => Result;
+  /** Start the time clock on a job (stops any other clock this person has running). */
+  clockIn: (jobId: string) => void;
+  /** Stop the clock and save the time as an entry. Returns the hours saved. */
+  clockOut: (jobId: string, note?: string) => number;
   deleteTimeEntry: (id: string) => void;
   saveExpense: (e: Omit<Expense, 'id'> & { id?: string }) => Result;
   deleteExpense: (id: string) => void;
@@ -773,6 +777,37 @@ export function StoreProvider({ children, storageKey }: { children: React.ReactN
     return null;
   }, [update]);
 
+  const clockOut = useCallback((jobId: string, note?: string) => {
+    const job = ref.current.jobs.find((j) => j.id === jobId);
+    if (!job?.clockStartedAt) return 0;
+    const start = new Date(job.clockStartedAt);
+    const hours = Math.round(((Date.now() - start.getTime()) / 3600000) * 100) / 100;
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.map((j) => (j.id === jobId ? { ...j, clockStartedAt: undefined } : j)),
+      // Under a minute is not worth a line on the invoice.
+      timeEntries:
+        hours >= 0.02
+          ? [...d.timeEntries, { id: newId(), jobId, technicianId: job.technicianId, date: start.toISOString(), hours, note: note?.trim() || undefined }]
+          : d.timeEntries,
+    }));
+    return hours >= 0.02 ? hours : 0;
+  }, [update]);
+
+  const clockIn = useCallback((jobId: string) => {
+    const job = ref.current.jobs.find((j) => j.id === jobId);
+    if (!job || job.clockStartedAt) return;
+    // One clock per person: stop the others first.
+    ref.current.jobs
+      .filter((j) => j.id !== jobId && j.clockStartedAt && j.technicianId === job.technicianId)
+      .forEach((j) => clockOut(j.id));
+    const now = new Date().toISOString();
+    update((d) => ({
+      ...d,
+      jobs: d.jobs.map((j) => (j.id === jobId ? { ...j, clockStartedAt: now } : j)),
+    }));
+  }, [update, clockOut]);
+
   const deleteTimeEntry = useCallback((id: string) => {
     update((d) => ({ ...d, timeEntries: d.timeEntries.filter((x) => x.id !== id) }));
   }, [update]);
@@ -907,6 +942,8 @@ export function StoreProvider({ children, storageKey }: { children: React.ReactN
       markPaid,
       reopenJob,
       saveTimeEntry,
+      clockIn,
+      clockOut,
       deleteTimeEntry,
       saveExpense,
       deleteExpense,
@@ -921,7 +958,7 @@ export function StoreProvider({ children, storageKey }: { children: React.ReactN
     saveTask, deleteTask, saveFleet, deleteFleet, saveTechnician, deleteTechnician, saveAssignment,
     toggleChecklistItem, setAssignmentStatus, deleteAssignment, setPrefs, resetDemoData,
     saveCategory, deleteCategory, saveShoppingItem, toggleShoppingItem, deleteShoppingItem, clearPurchased,
-    saveJob, deleteJob, markInvoiced, markPaid, reopenJob, saveTimeEntry, deleteTimeEntry, saveExpense, deleteExpense,
+    saveJob, deleteJob, markInvoiced, markPaid, reopenJob, saveTimeEntry, clockIn, clockOut, deleteTimeEntry, saveExpense, deleteExpense,
     exportFleet, importFleet,
   ]);
 

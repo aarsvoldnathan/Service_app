@@ -9,6 +9,29 @@ export function jobTotals(job: Job, entries: TimeEntry[], expenses: Expense[]): 
   return { hours, labor, expenses: exp, total: labor + exp };
 }
 
+/** Hours on the running clock right now (0 when stopped). */
+export function runningHours(job: Job, now: Date = new Date()): number {
+  if (!job.clockStartedAt) return 0;
+  const ms = now.getTime() - new Date(job.clockStartedAt).getTime();
+  return ms > 0 ? ms / 3600000 : 0;
+}
+
+/** Totals including the time on a running clock. */
+export function liveTotals(job: Job, entries: TimeEntry[], expenses: Expense[], now: Date = new Date()): JobTotals & { running: number } {
+  const t = jobTotals(job, entries, expenses);
+  const running = runningHours(job, now);
+  return { ...t, running, hours: t.hours + running, labor: t.labor + running * job.rate, total: t.total + running * job.rate };
+}
+
+/** 1.5 h -> "1:30:00". */
+export function clockText(hours: number): string {
+  const total = Math.max(0, Math.floor(hours * 3600));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 export type Period = 'week' | 'month' | 'quarter' | 'year';
 
 export const PERIOD_LABEL: Record<Period, string> = {
