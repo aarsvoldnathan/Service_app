@@ -207,6 +207,23 @@ export default function MachineEditScreen() {
 
         {!isNew && (
           <View style={s.section}>
+            <SectionTitle>AI helper</SectionTitle>
+            <Card>
+              <Text style={s.help}>
+                Uses the make, model and serial number to look up the factory maintenance schedule, service specs and part numbers. You
+                review everything before it is saved.
+              </Text>
+              <Button
+                title="✨ Fill specs & schedule with AI"
+                onPress={() => router.push({ pathname: '/assistant', params: { assetId: existing!.id, mode: 'setup' } })}
+                style={{ marginTop: spacing.sm }}
+              />
+            </Card>
+          </View>
+        )}
+
+        {!isNew && (
+          <View style={s.section}>
             <SectionTitle>Maintenance schedule</SectionTitle>
             <Card>
               <ScheduleEditor asset={existing!} thresholds={thresholds} />

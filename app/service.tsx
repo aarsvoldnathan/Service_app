@@ -46,7 +46,18 @@ export default function ServiceScreen() {
       <Stack.Screen
         options={{
           title: 'Record service',
-          headerRight: () => <HeaderButton title="Find ⌕" label="Find machine by scan, serial or search" onPress={() => router.push('/find')} />,
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {asset ? (
+                <HeaderButton
+                  title="✨ Ask AI"
+                  label="Ask the AI helper about this machine"
+                  onPress={() => router.push({ pathname: '/assistant', params: { assetId: asset.id } })}
+                />
+              ) : null}
+              <HeaderButton title="Find ⌕" label="Find machine by scan, serial or search" onPress={() => router.push('/find')} />
+            </View>
+          ),
         }}
       />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
